@@ -1,6 +1,6 @@
 # Projeto Back-End 
 
-**Código da Disciplina**: IBM8936<br>
+**Grupo**: Pedro Santos, Gabriel Melo, Bernardo Brandão, Iago Viana, Gabriel Maccachero
 
 ## Sobre 
 Descreva o seu projeto em linhas gerais. 
