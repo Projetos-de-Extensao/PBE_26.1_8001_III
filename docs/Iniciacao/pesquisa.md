@@ -5,49 +5,43 @@ title: Pesquisa
 
 # Pesquisa
 
-# Guia de Estágios
+## 2. Diretrizes do MEC (LDB e CNE)
 
-## 1. Objetivo do Estágio
-O estágio é visto como uma porta de entrada para o mercado, focado no desenvolvimento de habilidades práticas e como um complemento essencial da formação acadêmica.
+O estágio é definido como parte integrante do processo educacional, devendo obrigatoriamente estar vinculado ao currículo do curso.
 
-## 2. Tipos de Estágio
-* **Estágio obrigatório:** Faz parte da grade curricular e é requisito indispensável para a graduação.
-* **Estágio não obrigatório:** Atividade opcional, realizada como complemento à formação.
+### Base Legal
+!!! info "Fundamentação Jurídica"
+    * **LDB:** Lei de Diretrizes e Bases da Educação Nacional (Lei nº 9.394/96).
+    * **DCNs:** Diretrizes Curriculares Nacionais.
 
-## 3. Documentação Necessária
-Para a formalização do estágio, são exigidos:
-1.  **Termo de Compromisso de Estágio (TCE)**
-2.  **Convênio** entre a empresa e a instituição de ensino
-3.  **Plano de atividades** detalhado
+### Papel da Instituição de Ensino
+A instituição tem o dever de garantir o caráter pedagógico do estágio através de:
+* [x] **Acompanhamento e validação** contínua.
+* [x] **Designação de professor orientador** específico.
+* [x] **Avaliação de relatórios periódicos** entregues pelo aluno.
 
-## 4. Plano de Atividades
-O estágio deve possuir objetivos claros de aprendizado. Todas as atividades devem ser previamente definidas para garantir o foco educativo.
+### Supervisão Obrigatória
+O estágio só é válido se houver dupla supervisão:
+1.  **Professor Orientador:** Representando a faculdade.
+2.  **Supervisor:** Profissional da empresa com formação na área.
 
-## 5. Acompanhamento
-É obrigatório o acompanhamento sistemático tanto pela **instituição** quanto pela **empresa**, incluindo a realização de avaliações periódicas de desempenho.
+### Tipos de Estágio e Compatibilidade
+* **Obrigatório:** Previsto no currículo e necessário para diplomação.
+* **Não obrigatório:** Atividade complementar para ganho de experiência.
+* **Alinhamento:** As atividades **devem** estar estritamente alinhadas com a área de formação.
 
-## 6. Responsabilidades
-| Ator | Responsabilidade |
-| :--- | :--- |
-| **Instituição** | Valida a documentação e acompanha o progresso acadêmico. |
-| **Empresa** | Oferece o ambiente de aprendizado e supervisiona as tarefas. |
-| **Aluno** | Cumpre as atividades acordadas e segue o plano de estágio. |
+!!! failure "Validação Acadêmica"
+    A instituição possui autonomia para **invalidar** o estágio caso identifique que não há valor pedagógico real nas atividades executadas.
 
-## 7. Compatibilidade com o Curso
-As atividades práticas desenvolvidas no ambiente de trabalho devem estar estritamente relacionadas à área de formação do aluno.
+---
 
-## 8. Validação do Estágio
-A instituição de ensino possui a prerrogativa de **aprovar**, **reprovar** ou **exigir ajustes** no estágio, baseando-se nos critérios acadêmicos.
+## 3. Principais Nuances e Brechas
 
-## 9. Comparação com a Lei do Estágio
-* **Lei do Estágio:** Foca primordialmente nos direitos trabalhistas, limites de carga horária e formalização contratual.
-* **Ibmec:** Foca na qualidade do aprendizado, desenvolvimento de competências e validação do conteúdo acadêmico.
+É fundamental monitorar pontos que podem descaracterizar o estágio legalmente:
 
-!!! tip "10. Insights para Sistemas"
-    Para o desenvolvimento de plataformas de gestão, os seguintes pontos são essenciais:
-    * Mecanismos de **validação do plano de atividades**.
-    * Verificação automática de **compatibilidade com o curso**.
-    * Fluxos de **integração institucional** (assinaturas digitais e workflows de aprovação).
+* **Desvio de Função:** Quando o estagiário executa atividades operacionais de um funcionário CLT, perdendo o foco no aprendizado.
+* **Falta de Supervisão Real:** Estagiários que trabalham isolados, sem orientação de um profissional qualificado.
+* **Atividades Incompatíveis:** Tarefas que não possuem relação direta com a grade curricular do curso.
 
 # Diretrizes de Validação de Estágio - Ibmec
 
