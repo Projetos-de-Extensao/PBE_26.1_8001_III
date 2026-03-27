@@ -71,3 +71,124 @@ As horas que você cumpre no estágio podem ser aproveitadas e contabilizadas co
 2. **Acompanhamento:** Você terá o acompanhamento técnico de um supervisor na empresa e, se necessário, de um professor orientador do Ibmec.
 3. **Avaliação:** O seu supervisor na empresa precisará preencher um relatório de atividades e uma ficha de avaliação.
 4. **Aprovação Final:** A coordenação do curso irá avaliar toda a documentação e o relatório para dar o parecer final da validação.
+
+# Sistema de Verificação
+
+## 1. Objetivo do Sistema
+
+Desenvolver um sistema web em Python com Django para analisar contratos de estágio, validar conformidade com a Lei do Estágio e diretrizes educacionais, e gerar relatórios automáticos.
+
+## 2. Perfis de Usuário
+
+- Aluno
+- Empresa
+- Instituição
+- Administrador
+
+## 3. Fluxo Principal do Sistema
+
+1. Login do usuário
+2. Cadastro do estágio
+3. Upload do contrato
+4. Leitura dos dados
+5. Validação automática
+6. Geração de relatório
+7. Análise institucional
+8. Aprovação, reprovação ou pendência
+
+## 4. Estrutura de Módulos
+
+- Autenticação
+- Cadastro institucional
+- Cadastro de estágio
+- Upload de contrato
+- Extração de dados
+- Motor de validação
+- Relatórios
+- Aprovação institucional
+
+## 5. Modelagem do Banco de Dados
+
+Entidades principais:
+
+- Usuário
+- Curso
+- Empresa
+- Estágio
+- Contrato
+- Regra
+- Validação
+- Pendência
+
+## 6. Regras de Validação
+
+- Carga horária máxima de 6h/dia e 30h/semana
+- Estágio não obrigatório exige bolsa e transporte
+- Seguro obrigatório
+- Supervisor e professor orientador obrigatórios
+- Plano de atividades necessário
+- Duração máxima de 2 anos
+
+## 7. Lógica do Sistema
+
+O sistema analisa os dados cadastrados e compara com regras, retornando um dos seguintes status:
+
+- aprovado
+- pendente
+- irregular
+
+## 8. Estrutura Técnica (Django)
+
+Apps sugeridos:
+
+- `accounts`
+- `core`
+- `internships`
+- `validation`
+- `reports`
+
+## 9. Exemplo de Lógica em Python
+
+A função `validar_estagio()` compara os dados do estágio e retorna um status baseado em erros e pendências.
+
+```python
+def validar_estagio(estagio):
+    erros = []
+    pendencias = []
+
+    if estagio.carga_horaria_dia > 6:
+        erros.append("Carga horária diária acima do permitido.")
+
+    if estagio.carga_horaria_semana > 30:
+        erros.append("Carga horária semanal acima do permitido.")
+
+    if estagio.tipo_estagio == "nao_obrigatorio":
+        if not estagio.bolsa:
+            erros.append("Estágio não obrigatório sem bolsa.")
+        if not estagio.auxilio_transporte:
+            erros.append("Estágio não obrigatório sem auxílio-transporte.")
+
+    if not estagio.seguro:
+        erros.append("Seguro obrigatório não informado.")
+
+    if not estagio.supervisor:
+        pendencias.append("Supervisor não informado.")
+
+    if not estagio.professor_orientador:
+        pendencias.append("Professor orientador não informado.")
+
+    if not estagio.plano_atividades:
+        pendencias.append("Plano de atividades não anexado.")
+
+    if erros:
+        status = "irregular"
+    elif pendencias:
+        status = "pendente"
+    else:
+        status = "aprovado"
+
+    return {
+        "status": status,
+        "erros": erros,
+        "pendencias": pendencias,
+    }
