@@ -59,21 +59,21 @@ Para que o estágio seja válido e não gere passivos trabalhistas, a empresa e 
 !!! warning "Atenção ao TCE"
     O estágio **nunca** pode iniciar antes de o Termo de Compromisso estar devidamente assinado por todas as partes. Iniciar as atividades sem o contrato assinado já caracteriza vínculo de emprego.
 
-## ⏱️ Jornada de Atividades
+##  Jornada de Atividades
 
 A carga horária do estágio deve ser compatível com as atividades escolares e não pode ultrapassar os seguintes limites:
 
 * **Regra Geral:** Máximo de **6 horas diárias e 30 horas semanais** (para estudantes do ensino superior, educação profissional e ensino médio regular).
 * **Época de Provas:** Durante os períodos de avaliação, a carga horária do estágio deve ser reduzida (geralmente à metade), para garantir o bom desempenho acadêmico do estudante. A instituição de ensino deve comunicar as datas previamente.
 
-## 💰 Remuneração e Benefícios
+## Remuneração e Benefícios
 
 A compensação financeira varia estritamente de acordo com a modalidade do estágio (obrigatório ou não obrigatório):
 
 * **Estágio Não Obrigatório:** A concessão de **bolsa-auxílio** e do **auxílio-transporte** é **obrigatória**. O valor da bolsa é definido em livre acordo entre as partes, já que não há um piso salarial fixado por lei para estagiários.
 * **Estágio Obrigatório:** O pagamento de bolsa e auxílio-transporte é **opcional** por parte da empresa concedente (podendo ser feito de forma voluntária).
 
-## 🛡️ Direitos do Estagiário
+## Direitos do Estagiário
 
 Apesar de não ser celetista (CLT), o estagiário possui direitos garantidos por lei para assegurar seu bem-estar e desenvolvimento:
 
@@ -82,7 +82,7 @@ Apesar de não ser celetista (CLT), o estagiário possui direitos garantidos por
 * **Supervisão:** O estagiário deve ser acompanhado por um profissional do quadro de pessoal da empresa que tenha formação ou experiência comprovada na mesma área de conhecimento.
 * **Relatórios Periódicos:** A empresa deve enviar um relatório de atividades à instituição de ensino, com vista obrigatória ao estagiário, a cada 6 meses (no máximo).
 
-## ⏳ Duração do Contrato
+## Duração do Contrato
 
 A permanência do estagiário na mesma parte concedente tem um teto legal estabelecido:
 
@@ -91,7 +91,7 @@ A permanência do estagiário na mesma parte concedente tem um teto legal estabe
 
 ---
 
-## 🚨 Risco de Vínculo Empregatício
+##  Risco de Vínculo Empregatício
 
 !!! danger "Risco Trabalhista Alto"
     O descumprimento de **qualquer um** dos requisitos legais descritos acima (ex: falta de assinatura no TCE, jornada de trabalho superior a 6h/dia, ou exigir atividades que não têm relação com o curso do aluno) **descaracteriza o estágio e gera vínculo empregatício automático** nos moldes da CLT.
