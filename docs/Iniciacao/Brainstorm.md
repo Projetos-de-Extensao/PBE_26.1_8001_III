@@ -201,3 +201,9 @@ O sistema deve funcionar como um **pipeline de verificação**, garantindo:
 - Apoio à decisão institucional  
 
 Esse modelo permite a construção de um sistema escalável e adaptável a diferentes instituições.
+
+## Autor(es)
+
+| Data | Versão | Descrição | Autor(es) |
+| -- | -- | -- | -- |
+| 16/04/2026 | 1.0 | Criação do documento | Gabriel Melo,Bernardo Brandão,Iago Viana,Pedro Dos Santos e Gabriel m| 

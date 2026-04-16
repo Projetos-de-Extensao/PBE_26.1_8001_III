@@ -14,123 +14,139 @@ A construção do protótipo de alta fidelidade auxilia a equipe de desenvolvime
 Iniciamos o projeto através dos levantamentos iniciais da equipe, após discussões a ferramenta Figma foi selecionada para produzir o protótipo de alta fidelidade com auxílio do Material Design Color Tool.
 </p>
 
-## Protótipo de alta fidelidade
+## Protótipo de baixa fidelidade
 
 ### Versão 1.0
 
 ### Tela Login
 
-[![Prototipo 1](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
+```plantuml
+@startsalt
+{+
+  <b>Plataforma de Gestao de Estagios - Ibmecd
+  ==
+  Login 
+  | "matricula@alunos.ibmec.edu.br"
+  Senha 
+  | "*******"
+  [ Entrar ]
+  --
+  [x] Lembrar-me
+  [Esqueci minha senha]
+}
+@endsalt
+```
 
-### Tela Cadastro 1
+### Dashboard do Aluno
 
-[![Prototipo 2](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
+```plantuml
+@startsalt
+{+
+  <b>Bem-vindo, Aluno! | [ Sair ]
+  ==
+  Meus Estagios:
+  {#
+    Empresa | Status | Acao
+    Tech Solutions | [Irregular] | [ Ver Detalhes ]
+    Inovacao S.A.  | [Aprovado]  | [ Ver Detalhes ]
+  }
+  --
+  [ + Novo Cadastro de Estagio ]
+}
+@endsalt
+```
 
-### Tela Cadastro 2
+### Tela de Cadastro de Dados do Estágio
 
-[![Prototipo 3](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
+```plantuml
+@startsalt
+{+
+  <b>Encerramento de Estagio - Envio de Documentos
+  ==
+  Aluno:*******
+  Empresa: Tech Solutions
+  --
+  <b>1. Relatorio Final de Estagio:
+  [ Escolher arquivo ] 
+  | "Relatorio_Final_aluno.pdf"
+  --
+  <b>2. Avaliacao de Desempenho (Preenchida pelo Supervisor):
+  [ Escolher arquivo ] 
+  | "Avaliacao_TechSolutions_Assinada.pdf"
+  --
+  <b>3. Comprovante de Rescisao / Fim de Contrato (Opcional):
+  [ Escolher arquivo ] 
+  | "Nenhum arquivo selecionado"
+  --
+  [ Cancelar ] 
+  [ Enviar para Analise da Coordenacao ]
+}
+@endsalt
+```
 
-### Tela Esqueceu Senha
+### Tela de Envio de Documentos (Upload)
 
-[![Prototipo 4](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
+```plantuml
+@startsalt
+{+
+  <b>Envio de Documentos
+  ==
+  Termo de Compromisso (TCE):
+  [ Escolher arquivo ] 
+  | "TCE_aluno_Assinado.pdf"
+  --
+  Plano de Atividades:
+  [ Escolher arquivo ] 
+  | "Nenhum arquivo selecionado"
+  --
+  [ Cancelar ] 
+  | [ Enviar para Validacao ]
+}
+@endsalt
+```
 
-### Tela do Feed
+### Visão da Instituição (Painel da Coordenação)
 
-[![Prototipo 5](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
+```plantuml
+@startsalt
+{+
+  <b>Painel de Aprovacao Institucional
+  ==
+  Filtro de Status: Pendentes
+  {#
+    Aluno | Curso | Status Motor | Acao
+    Gabriel Melo | Eng. Software | [Pendente] | [ Analisar ]
+    Joao Silva   | Direito       | [Irregular] | [ Analisar ]
+  }
+}
+@endsalt
+```
 
-### Tela Feed com configurações
+### Relatório de Validação (Resultado do Motor)
 
-[![Prototipo 6](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Perfil
-
-[![Prototipo 7](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 1
-
-[![Prototipo 8](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 2
-
-[![Prototipo 9](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 3
-
-[![Prototipo 10](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 4
-
-[![Prototipo 11](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela com meus torneios
-
-[![Prototipo 12](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela de inscrição em torneio
-
-[![Prototipo 13](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-<p align = "justify">
-Na primeira versão do protótipo utilizamos a ferramenta <a href="https://material.io/resources/color/#!/?view.left=0&view.right=0">Material Design Color Tool</a>  para auxiliar na criação da paleta de cores do aplicativo, definimos as cores base do aplicativo mas as cores definidas para as telas 12 e 13 ainda não foram decididas.
-</p>
-
-### Versão 2.0
-
-### Versão 1.0
-
-### Tela Login
-
-[![Prototipo 1](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastro 1
-
-[![Prototipo 2](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastro 2
-
-[![Prototipo 3](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Esqueceu Senha
-
-[![Prototipo 4](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela do Feed
-
-[![Prototipo 5](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Feed com configurações
-
-[![Prototipo 6](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Perfil
-
-[![Prototipo 7](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 1
-
-[![Prototipo 8](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 2
-
-[![Prototipo 9](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 3
-
-[![Prototipo 10](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela Cadastrar torneio 4
-
-[![Prototipo 11](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela com meus torneios
-
-[![Prototipo 12](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-### Tela de inscrição em torneio
-
-[![Prototipo 13](../assets/Prototipo/image.png)](../assets/Prototipo/image.png)
-
-link para o `<a href="https://www.figma.com/">`Protótipo`</a>`
+```plantuml
+@startsalt
+{+
+  <b>Relatorio de Validacao Automatica
+  ==
+  Aluno: ************
+  Empresa: Tech Solutions
+  --
+  <b>Status Final: [ IRREGULAR ]
+  --
+  Erros Encontrados:
+  * Carga horaria semanal acima do permitido.
+  * Estagio nao obrigatorio sem bolsa.
+  Pendencias:
+  * Plano de atividades nao anexado.
+  --
+  Decisao Institucional:
+  () Aprovar  () Reprovar  (X) Solicitar Correcao
+  --
+  [ Notificar Aluno ] | [ Voltar ao Painel ]
+}
+@endsalt
+```
 
 ## Conclusão
 
@@ -140,17 +156,10 @@ A partir da elaboração do protótipo foi possível ter uma noção inicial da 
 
 ## Referências
 
-> Material Design Color Tool. Disponível em:  https://material.io/resources/color/#!/?view.left=0&view.right=0
-
-> PMI. Um guia do conhecimento em gerenciamento de projetos. Guia PMBOK® 5a. ed. EUA: Project Management Institute, 2013.
-
-> Ferramenta Figma. Disponível em https://www.figma.com
+> Ferramenta PlantUML. Disponível em (https://plantuml.com/salt)
 
 ## Autor(es)
 
-| Data     | Versão | Descrição                            | Autor(es)                                                                            |
-| -------- | ------- | -------------------------------------- | ------------------------------------------------------------------------------------ |
-| 07/09/20 | 1.0     | Criação do documento                 | Lucas Alexandre e Matheus Estanislau                                                 |
-| 07/09/20 | 1.1     | Adicionado as imagens do protótipo    | Lucas Alexandre e Matheus Estanislau                                                 |
-| 07/09/20 | 1.2     | Adicionado conclusão e referências   | Lucas Alexandre e Matheus Estanislau                                                 |
-| 26/10/20 | 2.0     | Adicionada a versão 2.0 do protótipo | João Pedro, Lucas Alexandre, Matheus Estanislau, Moacir Mascarenha e Renan Cristyan |
+| Data | Versão | Descrição | Autor(es) |
+| -- | -- | -- | -- |
+| 16/04/2026 | 1.0 | Criação do documento | Gabriel Melo,Bernardo Brandão,Iago Viana,Pedro Dos Santos e Gabriel m| 

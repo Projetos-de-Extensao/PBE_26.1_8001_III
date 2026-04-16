@@ -241,3 +241,10 @@ def validar_estagio(estagio):
         "erros": erros,
         "pendencias": pendencias,
     }
+```
+
+## Autor(es)
+
+| Data | Versão | Descrição | Autor(es) |
+| -- | -- | -- | -- |
+| 16/04/2026 | 1.0 | Criação do documento | Gabriel Melo,Bernardo Brandão,Iago Viana,Pedro Dos Santos e Gabriel m| 
