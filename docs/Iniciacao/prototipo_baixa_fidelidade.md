@@ -23,7 +23,7 @@ Iniciamos o projeto através dos levantamentos iniciais da equipe, após discuss
 ```plantuml
 @startsalt
 {+
-  <b>Plataforma de Gestao de Estagios - Ibmecd
+  <b>Plataforma de Gestao de Estagios - Ibmec
   ==
   Login 
   | "matricula@alunos.ibmec.edu.br"

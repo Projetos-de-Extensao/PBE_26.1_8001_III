@@ -52,6 +52,8 @@ markdown_extensions:
   - footnotes
   # Annotations, Grids, Images
   - md_in_html
+  # plantuml
+  - plantuml_markdown
   # Images
   - pymdownx.blocks.caption
   # Formatting
@@ -96,6 +98,8 @@ plugins:
   - minify:
       minify_html: true
   - search
+  - plantuml:
+      puml_url: https://www.plantuml.com/plantuml/ # Recomendado para funcionar em qualquer máquina da equipe
 
 theme:
   name: material
