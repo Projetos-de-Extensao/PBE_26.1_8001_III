@@ -1,129 +1,203 @@
----
-id: brainstorm
-title: Brainstorm
----
- 
-## Introdução
-<p align = "justify">
-O brainstorm é uma técnica de elicitação de requisitos que consiste em reunir a equipe e discutir sobre diversos tópicos gerais do projeto apresentados no documento problema de negócio. No brainstorm o diálogo é incentivado e críticas são evitadas para permitir que todos colaborem com suas próprias ideias.
-</p>
- 
-## Metodologia
-<p align = "justify">
-A equipe se reuniu para debater ideias gerais sobre o projeto via..., começou .... e terminou..., onde o XXXX XXXX foi o moderador, direcionando a equipe com questões pré-elaboradas, e transcrevendo as respostas para o documento.
-</p>
- 
-## Brainstorm
- 
-## Versão 1.0
- 
-## Perguntas
- 
-### 1. Qual o objetivo principal da aplicação?
- 
-<p align = "justify">
-<b>XXXX</b> - Deve ser uma plataforma onde qualquer pessoa possa...
-</p>
- 
-<b>ZZZ</b> - A plataforma deve fornece...
- 
-<b>YYYY</b> - O objetivo da aplicação é....
- 
-<b>WWWW</b> - O principal objetivo da aplicação é a...
- 
-<b>KKKK</b> - A plataforma deve gerenciar...
-</p>
- 
----
- 
-### 2. Como será o processo para cadastrar um novo cliente?
- 
-<p align = "justify">
-<b>XXXX</b> - O moderador deverá fazer login e...
- 
-<b>YYYY</b> - O cliente...
- 
-<b>WWWW</b> - Com o usuário logado, ele deverá...
+# Brainstorm do Projeto
 
-<b>ZZZZ</b> - O cliente...
- 
-<b>KKK</b> - O cliente...
- 
----
- 
-### 3. Como será a forma de adicionar produtos?
- 
-<p align = "justify">
-<b>XXXX</b> - O cliente ao cadastrar...
-</p>
- 
-<p align = "justify">
-<b>YYYYY</b> - O produto tem...
-</p>
- 
-<b>ZZZZ</b> - O produto....
- 
-<b>XXXX</b> - O produto....
+## 1. Qual é o problema real que o sistema resolve?
 
- 
----
- 
-### 4. Outras perguntas pertinentes ao contexto
+Antes de pensar em tela, banco ou código, é necessário definir com clareza o problema principal.
 
-<p align = "justify">
-<b>XXXX</b> - Com a localização...
- 
-<b>YYYY</b> - O cliente...
- 
-<b>ZZZ</b> - O cliente...
- 
----
- 
-### 5. "Outras perguntas pertinentes ao contexto", Como seria a forma de adicionar do cliente adicionar os produtos ?
-<p align = "justify">
-<b>XXX</b> - O cliente....
-</p>
- 
-### 6. Quais informações seriam interessante para o cliente?
-<p align = "justify">
-   <b>XXX</b> - Informações...
-   
-   <b>ZZZZ</b> - O cliente usuário poderá acessar informações...
+O projeto busca resolver três dores principais:
 
-   <b>WWWWs</b> - O usuário poderá ver scouts de partidas do torneio, ver as regras dos torneios, locais e data das partidas.
-   
-</p>
- 
-### Requisitos elicitados
- 
-|ID|Descrição|
-|----|-------------|
-|BS01| O cliente...|
-|BS02| O cliente...|
-|BS03| O cliente...|
-|BS04| O cliente...|
-|BS05| O cliente...|
-|BS06| O cliente...|
-|BS07| O cliente...|
-|BS08| O cliente...|
-|BS09| O cliente...|
-|BS10| O produto...|
-|BS11| O produto...|
-|BS12| O produto...|
-|BS13| O produto...|
-|BS14| O produto...|
-|BS15| O produto...|
- 
+### 1.1 Falta de padronização
+Atualmente, a análise de contratos de estágio é feita de forma manual, o que gera inconsistências.
+
+### 1.2 Risco jurídico
+Um contrato pode estar em desacordo com a Lei do Estágio.
+
+### 1.3 Risco acadêmico/institucional
+Mesmo que o contrato esteja correto juridicamente, ele pode não atender às exigências da instituição.
+
+### Pergunta central
+
+> Como automatizar ou padronizar a verificação de contratos de estágio para reduzir erros, acelerar análises e melhorar a comunicação entre aluno, empresa e instituição?
+
+---
+
+## 2. O sistema é um verificador ou uma plataforma?
+
+### Caminho 1 — Sistema verificador
+
+- Receber dados  
+- Validar  
+- Gerar relatório  
+
+### Caminho 2 — Plataforma completa
+
+- Cadastro de estágio  
+- Upload de contrato  
+- Análise  
+- Acompanhamento  
+- Comunicação  
+- Histórico  
+
+
+### Definição sugerida
+
+> O sistema será uma plataforma de apoio à gestão e verificação de estágios, com foco em conformidade legal, educacional e institucional.
+
+---
+
+## 3. Entradas, processamento e saídas
+
+### Entradas
+- Dados do aluno  
+- Dados da empresa  
+- Dados do estágio  
+- Contrato  
+- Plano de atividades  
+- Regras institucionais  
+
+### Processamento
+- Leitura dos dados  
+- Validação  
+- Comparação com regras  
+- Classificação  
+
+### Saídas
+- Relatório de conformidade  
+- Pendências  
+- Irregularidades  
+- Decisão institucional  
+- Notificações  
+
+---
+
+## 4. Estrutura em blocos
+
+### 4.1 Entrada e cadastro
+- Quem cadastra o estágio?  
+- O aluno cadastra sozinho?  
+- A empresa participa?  
+- A instituição só revisa?  
+
+---
+
+### 4.2 Documentação
+- Apenas PDF ou também DOCX?  
+- O contrato será apenas anexado ou interpretado?  
+- O plano de atividades será obrigatório?  
+
+---
+
+### 4.3 Motor de validação
+- Quais regras são fixas?  
+- Quais são configuráveis?  
+- Valida apenas presença ou também coerência?  
+
+---
+
+### 4.4 Relatório e decisão
+- O sistema só retorna status?  
+- Explica os erros?  
+- Sugere correções?  
+- Quem aprova ou reprova?  
+
+---
+
+### 4.5 Comunicação
+- Haverá notificações?  
+- Existirá histórico de correções?  
+- A empresa poderá reenviar documentos?  
+
+---
+
+## 5. Perguntas fundamentais do sistema
+
+### 5.1 Usuário e fluxo
+- Quem inicia o processo?  
+- O aluno pode cadastrar sozinho?  
+- A empresa precisa validar?  
+- A instituição participa em qual etapa?  
+
+---
+
+### 5.2 Estágio
+- É obrigatório ou não?  
+- O aluno está matriculado?  
+- Existe vínculo com o curso?  
+- Há supervisor e professor orientador?  
+- Existe plano de atividades?  
+- Qual a carga horária?  
+- Qual a duração?  
+
+---
+
+### 5.3 Empresa
+- Existe convênio com a instituição?  
+- Há responsável direto pelo estagiário?  
+- Bolsa, transporte e seguro estão definidos?  
+
+---
+
+### 5.4 Instituição
+- Usará apenas regras da lei ou regras próprias?  
+- Aprovação será manual ou automática?  
+- Regras mudam por curso?  
+
+---
+
+### 5.5 Contrato
+- Será preenchido no sistema ou apenas anexado?  
+- Haverá validação de campos antes do envio?  
+- Haverá versionamento?  
+
+---
+
+## 6. Perguntas que o sistema precisa responder
+
+O sistema deve responder:
+
+- O estágio está conforme a Lei do Estágio?  
+- O estágio atende aos critérios institucionais?  
+- Existem pendências?  
+- Existem irregularidades?  
+- O estágio pode ser aprovado?  
+- O que precisa ser corrigido?  
+- Quem deve corrigir?  
+
+---
+
+## 7. Níveis de validação
+
+### 7.1 Validação documental
+- Contrato anexado  
+- Plano de atividades  
+- Supervisor informado  
+
+---
+
+### 7.2 Validação legal
+- Carga horária  
+- Bolsa  
+- Transporte  
+- Seguro  
+- Duração  
+
+---
+
+### 7.3 Validação institucional
+- Convênio  
+- Professor orientador  
+- Compatibilidade com o curso  
+- Regras internas  
+
+---
+
 ## Conclusão
-<p align = "justify">
-Através da aplicação da técnica, foi possível elicitar alguns dos primeiros requisitos do projeto.
-</p>
-## Referências Bibliográficas
- 
-> BARBOSA, S. D. J; DA SILVA, B. S. Interação humano-computador. Elsevier, 2010.
- 
- 
-## Autor(es)
-| Data | Versão | Descrição | Autor(es) |
-| -- | -- | -- | -- |
-| DD/MM/YYYY | 1.0 | Criação do documento | XXX XXXX, XXXX XXXX, YYY YYYY e ZZZ XXXX |
+
+O sistema deve funcionar como um **pipeline de verificação**, garantindo:
+
+- Conformidade legal  
+- Conformidade educacional  
+- Organização do processo  
+- Apoio à decisão institucional  
+
+Esse modelo permite a construção de um sistema escalável e adaptável a diferentes instituições.
