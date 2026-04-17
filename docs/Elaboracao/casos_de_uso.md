@@ -6,6 +6,8 @@ title: Diagrama de Casos de Uso
 ## Casos de Uso
 
 ### Descrição:
+
+```plantuml
 @startuml
 left to right direction
 skinparam packageStyle rectangle
@@ -50,3 +52,4 @@ UC04 --> Empresa : "Aviso de erro"
 UC04 --> Aluno : "Aviso de erro"
 
 @enduml
+```
