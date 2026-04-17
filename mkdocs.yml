@@ -1,18 +1,11 @@
 ---
-repo_url: https://github.com/jonh-carvalho/PBE_25.2_8003
+repo_url: https://github.com/Projetos-de-Extensao/PBE_26.1_8001_III
 site_author: Jonh Carvalho
-site_name: PBE_25.2_8003
-copyright: Copyright ©️ 2025, Jonh Carvalho
+site_name: PBE_26.1_8003
+copyright: Copyright ©️ 2026, Jonh Carvalho
 
 nav: 
   - Home: index.md
-  - Disciplina:
-      - Aulas: Disciplina/aulas.md
-      - Ambiente: Disciplina/ambiente.md
-      - Github: Disciplina/github.md
-      - Mkdocs: Disciplina/mkdocs.md
-      - CodeSpace: Disciplina/codespace.md
-      - Avaliações: Disciplina/avaliacoes.md
   - Iniciação: 
       - Index: Iniciacao/index.md
       - Pesquisa: Iniciacao/pesquisa.md
