@@ -5,7 +5,7 @@ title: Pesquisa
 
 # Pesquisa
 
-## 2. Diretrizes do MEC (LDB e CNE)
+## Diretrizes do MEC (LDB e CNE)
 
 O estágio é definido como parte integrante do processo educacional, devendo obrigatoriamente estar vinculado ao currículo do curso.
 
@@ -35,7 +35,7 @@ O estágio só é válido se houver dupla supervisão:
 
 ---
 
-## 3. Principais Nuances e Brechas
+## Principais Nuances e Brechas
 
 É fundamental monitorar pontos que podem descaracterizar o estágio legalmente:
 
@@ -48,7 +48,7 @@ O estágio é um **ato educativo escolar supervisionado**, desenvolvido no ambie
 
 ---
 
-## 📋 Requisitos Obrigatórios
+## Requisitos Obrigatórios
 
 Para que o estágio seja válido e não gere passivos trabalhistas, a empresa e o estudante devem cumprir pilares essenciais:
 
@@ -123,18 +123,18 @@ As horas que você cumpre no estágio podem ser aproveitadas e contabilizadas co
 
 # Sistema de Verificação
 
-## 1. Objetivo do Sistema
+## Objetivo do Sistema
 
 Desenvolver um sistema web em Python com Django para analisar contratos de estágio, validar conformidade com a Lei do Estágio e diretrizes educacionais, e gerar relatórios automáticos.
 
-## 2. Perfis de Usuário
+## Perfis de Usuário
 
 - Aluno
 - Empresa
 - Instituição
 - Administrador
 
-## 3. Fluxo Principal do Sistema
+## Fluxo Principal do Sistema
 
 1. Login do usuário
 2. Cadastro do estágio
@@ -145,7 +145,7 @@ Desenvolver um sistema web em Python com Django para analisar contratos de está
 7. Análise institucional
 8. Aprovação, reprovação ou pendência
 
-## 4. Estrutura de Módulos
+## Estrutura de Módulos
 
 - Autenticação
 - Cadastro institucional
@@ -156,7 +156,7 @@ Desenvolver um sistema web em Python com Django para analisar contratos de está
 - Relatórios
 - Aprovação institucional
 
-## 5. Modelagem do Banco de Dados
+## Modelagem do Banco de Dados
 
 Entidades principais:
 
@@ -169,7 +169,7 @@ Entidades principais:
 - Validação
 - Pendência
 
-## 6. Regras de Validação
+## Regras de Validação
 
 - Carga horária máxima de 6h/dia e 30h/semana
 - Estágio não obrigatório exige bolsa e transporte
@@ -178,7 +178,7 @@ Entidades principais:
 - Plano de atividades necessário
 - Duração máxima de 2 anos
 
-## 7. Lógica do Sistema
+## Lógica do Sistema
 
 O sistema analisa os dados cadastrados e compara com regras, retornando um dos seguintes status:
 
@@ -186,7 +186,7 @@ O sistema analisa os dados cadastrados e compara com regras, retornando um dos s
 - pendente
 - irregular
 
-## 8. Estrutura Técnica (Django)
+## Estrutura Técnica (Django)
 
 Apps sugeridos:
 
@@ -196,7 +196,7 @@ Apps sugeridos:
 - `validation`
 - `reports`
 
-## 9. Exemplo de Lógica em Python
+## Exemplo de Lógica em Python
 
 A função `validar_estagio()` compara os dados do estágio e retorna um status baseado em erros e pendências.
 
