@@ -297,6 +297,7 @@ class Contrato(models.Model):
     data_submissao = models.DateTimeField(auto_now_add=True)
     versao = models.PositiveIntegerField(default=1)
     arquivo_original = models.BinaryField(blank=True, null=True)
+    arquivo_pdf = models.FileField(upload_to='contratos/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=StatusContrato.choices, default=StatusContrato.RECEBIDO)
     score_conformidade = models.FloatField(default=0.0)
 
@@ -306,6 +307,10 @@ class Contrato(models.Model):
     def atualizar_status(self, novo_status):
         self.status = novo_status
         self.save()
+
+    def clean(self):
+        if self.arquivo_pdf and not self.arquivo_pdf.name.lower().endswith('.pdf'):
+            raise ValidationError({'arquivo_pdf': 'O contrato deve ser enviado em formato PDF.'})
 
     def save(self, *args, **kwargs):
         if self.estagio:

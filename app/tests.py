@@ -1,7 +1,12 @@
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
+import shutil
 
-from django.test import TestCase
+from django.contrib.auth.models import User as AuthUser
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
 
 from app.models import (
     AnaliseContrato,
@@ -15,6 +20,9 @@ from app.models import (
     TipoEstagio,
     Usuario,
 )
+
+
+TEST_MEDIA_ROOT = Path(__file__).resolve().parent.parent / 'test_media'
 
 
 class AnaliseContratoTests(TestCase):
@@ -114,3 +122,89 @@ class AnaliseContratoTests(TestCase):
 
         contrato.refresh_from_db()
         self.assertEqual(contrato.status, StatusContrato.APROVADO_FINAL)
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class ApiWorkflowTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_user = AuthUser.objects.create_user(username='tester', password='senha123')
+        self.usuario = Usuario.objects.create(
+            cpf='987.654.321-00',
+            nome='Bruno Teste',
+            email='bruno@example.com',
+        )
+        self.empresa = Empresa.objects.create(
+            cnpj='98.765.432/0001-10',
+            razao_social='Empresa Teste',
+            responsavel='Responsavel Teste',
+        )
+        self.instituicao = Instituicao.objects.create(
+            nome_unidade='Ibmec Teste',
+            coordenador='Coordenador Teste',
+        )
+        self.estagio = Estagio.objects.create(
+            usuario=self.usuario,
+            empresa=self.empresa,
+            instituicao=self.instituicao,
+            curso='Direito',
+            tipo_estagio=TipoEstagio.OBRIGATORIO,
+            seguro_apolice='APOLICE-999',
+            supervisor_nome='Supervisor Teste',
+            professor_orientador='Orientador Teste',
+            atividades='Atividades juridicas acompanhadas.',
+        )
+        self.contrato = Contrato.objects.create(
+            usuario=self.usuario,
+            empresa=self.empresa,
+            instituicao=self.instituicao,
+            estagio=self.estagio,
+        )
+
+    def test_register_endpoint_cria_usuario_django(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {'username': 'novo', 'email': 'novo@example.com', 'password': 'senha123'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(AuthUser.objects.filter(username='novo').exists())
+
+    def test_contrato_filter_por_status(self):
+        response = self.client.get('/api/contratos/', {'status': StatusContrato.RECEBIDO})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.contrato.id)
+
+    def test_upload_pdf_rejeita_arquivo_sem_extensao_pdf(self):
+        self.client.force_authenticate(user=self.auth_user)
+        arquivo = SimpleUploadedFile('contrato.txt', b'conteudo', content_type='text/plain')
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': arquivo},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('arquivo_pdf', response.data)
+
+    def test_upload_pdf_aceita_pdf(self):
+        self.client.force_authenticate(user=self.auth_user)
+        arquivo = SimpleUploadedFile('contrato.pdf', b'%PDF-1.4 conteudo', content_type='application/pdf')
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': arquivo},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['arquivo_pdf'].endswith('.pdf'))

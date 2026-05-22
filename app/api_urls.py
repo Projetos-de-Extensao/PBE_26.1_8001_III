@@ -7,8 +7,11 @@ from app.api import (
     EmpresaViewSet,
     EstagioViewSet,
     InstituicaoViewSet,
+    LoginAPIView,
+    LogoutAPIView,
     ParecerInstitucionalViewSet,
     PendenciaViewSet,
+    RegisterAPIView,
     RegraValidacaoViewSet,
     RelatorioConformidadeViewSet,
     SistemaValidadorViewSet,
@@ -30,5 +33,8 @@ router.register(r'pareceres', ParecerInstitucionalViewSet, basename='parecer-ins
 router.register(r'sistemas-validadores', SistemaValidadorViewSet, basename='sistema-validador')
 
 urlpatterns = [
+    path('auth/register/', RegisterAPIView.as_view(), name='auth-register'),
+    path('auth/login/', LoginAPIView.as_view(), name='auth-login'),
+    path('auth/logout/', LogoutAPIView.as_view(), name='auth-logout'),
     path('', include(router.urls)),
 ]

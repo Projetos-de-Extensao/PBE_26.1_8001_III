@@ -85,6 +85,19 @@ class EstagioSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'status_validacao', 'criado_em', 'atualizado_em']
 
+    def validate(self, data):
+        data_inicio = data.get('data_inicio', getattr(self.instance, 'data_inicio', None))
+        data_fim = data.get('data_fim', getattr(self.instance, 'data_fim', None))
+        if data_inicio and data_fim and data_fim < data_inicio:
+            raise serializers.ValidationError({'data_fim': 'Data final nao pode ser anterior a data inicial.'})
+
+        for campo in ['carga_horaria_diaria', 'carga_horaria_semanal', 'bolsa_auxilio']:
+            valor = data.get(campo)
+            if valor is not None and valor < 0:
+                raise serializers.ValidationError({campo: 'Valor nao pode ser negativo.'})
+
+        return data
+
 
 class ContratoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -98,10 +111,18 @@ class ContratoSerializer(serializers.ModelSerializer):
             'data_submissao',
             'versao',
             'arquivo_original',
+            'arquivo_pdf',
             'status',
             'score_conformidade',
         ]
         read_only_fields = ['id', 'data_submissao', 'status', 'score_conformidade']
+
+    def validate_arquivo_pdf(self, arquivo):
+        if arquivo and not arquivo.name.lower().endswith('.pdf'):
+            raise serializers.ValidationError('O contrato deve ser enviado em formato PDF.')
+        if arquivo and getattr(arquivo, 'content_type', None) not in [None, 'application/pdf']:
+            raise serializers.ValidationError('O arquivo enviado nao parece ser um PDF.')
+        return arquivo
 
 
 class PendenciaSerializer(serializers.ModelSerializer):
@@ -175,6 +196,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError('Nome de usuario ja cadastrado.')
+        return value
+
+    def validate_email(self, value):
+        if value and User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Email ja cadastrado.')
+        return value
 
 
 class LoginSerializer(serializers.Serializer):
