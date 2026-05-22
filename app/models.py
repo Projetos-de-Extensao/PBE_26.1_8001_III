@@ -1,5 +1,8 @@
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.contrib.auth.models import User
+
 
 class Usuario(models.Model):
     cpf = models.CharField(max_length=14, unique=True)
@@ -22,9 +25,34 @@ class Empresa(models.Model):
 class StatusContrato(models.TextChoices):
     RECEBIDO = 'RECEBIDO', 'Recebido'
     PROCESSANDO = 'PROCESSANDO', 'Processando'
-    INVALIDO_PENDENTE = 'INVALIDO_PENDENTE', 'Inválido pendente'
+    INVALIDO_PENDENTE = 'INVALIDO_PENDENTE', 'Invalido pendente'
     VALIDADO_OK = 'VALIDADO_OK', 'Validado OK'
     APROVADO_FINAL = 'APROVADO_FINAL', 'Aprovado final'
+    REPROVADO = 'REPROVADO', 'Reprovado'
+
+
+class TipoEstagio(models.TextChoices):
+    OBRIGATORIO = 'OBRIGATORIO', 'Obrigatorio'
+    NAO_OBRIGATORIO = 'NAO_OBRIGATORIO', 'Nao obrigatorio'
+
+
+class NivelEnsino(models.TextChoices):
+    SUPERIOR = 'SUPERIOR', 'Superior'
+    MEDIO = 'MEDIO', 'Medio'
+    PROFISSIONAL = 'PROFISSIONAL', 'Educacao profissional'
+    FUNDAMENTAL_EJA = 'FUNDAMENTAL_EJA', 'Fundamental EJA'
+
+
+class ResultadoAnalise(models.TextChoices):
+    APROVADO = 'APROVADO', 'Aprovado'
+    PENDENTE = 'PENDENTE', 'Pendente'
+    REPROVADO = 'REPROVADO', 'Reprovado'
+
+
+class SeveridadePendencia(models.TextChoices):
+    INFO = 'INFO', 'Informacao'
+    PENDENCIA = 'PENDENCIA', 'Pendencia'
+    ERRO = 'ERRO', 'Erro'
 
 
 class Instituicao(models.Model):
@@ -43,11 +71,231 @@ class Instituicao(models.Model):
         contrato.save()
 
 
+class RegraValidacao(models.Model):
+    codigo = models.CharField(max_length=50, unique=True)
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField()
+    severidade_padrao = models.CharField(
+        max_length=20,
+        choices=SeveridadePendencia.choices,
+        default=SeveridadePendencia.ERRO,
+    )
+    ativa = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['codigo']
+
+    def __str__(self):
+        return f'{self.codigo} - {self.nome}'
+
+    @classmethod
+    def defaults(cls):
+        return [
+            {
+                'codigo': 'CARGA_DIARIA',
+                'nome': 'Carga horaria diaria',
+                'descricao': 'Carga horaria diaria nao deve ultrapassar 6 horas.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+            {
+                'codigo': 'CARGA_SEMANAL',
+                'nome': 'Carga horaria semanal',
+                'descricao': 'Carga horaria semanal nao deve ultrapassar 30 horas.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+            {
+                'codigo': 'SEGURO',
+                'nome': 'Seguro obrigatorio',
+                'descricao': 'Contrato deve informar seguro contra acidentes pessoais.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+            {
+                'codigo': 'SUPERVISOR',
+                'nome': 'Supervisor da empresa',
+                'descricao': 'Contrato deve indicar supervisor da parte concedente.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'PROFESSOR_ORIENTADOR',
+                'nome': 'Professor orientador',
+                'descricao': 'Estagio deve ter acompanhamento institucional.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'ATIVIDADES',
+                'nome': 'Plano de atividades',
+                'descricao': 'Atividades devem estar descritas para analise de compatibilidade.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'BOLSA',
+                'nome': 'Bolsa-auxilio',
+                'descricao': 'Estagio nao obrigatorio exige bolsa-auxilio.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+            {
+                'codigo': 'AUXILIO_TRANSPORTE',
+                'nome': 'Auxilio-transporte',
+                'descricao': 'Estagio nao obrigatorio exige auxilio-transporte.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+            {
+                'codigo': 'DURACAO_MAXIMA',
+                'nome': 'Duracao maxima',
+                'descricao': 'Contrato nao deve ultrapassar 2 anos na mesma empresa.',
+                'severidade_padrao': SeveridadePendencia.ERRO,
+            },
+        ]
+
+    @classmethod
+    def obter_config(cls, codigo, severidade_padrao):
+        regra = cls.objects.filter(codigo=codigo).first()
+        if regra and not regra.ativa:
+            return None
+        return regra or cls(codigo=codigo, severidade_padrao=severidade_padrao)
+
+
+class Estagio(models.Model):
+    usuario = models.ForeignKey(Usuario, related_name='estagios', on_delete=models.CASCADE)
+    empresa = models.ForeignKey(Empresa, related_name='estagios', on_delete=models.CASCADE)
+    instituicao = models.ForeignKey(Instituicao, related_name='estagios', on_delete=models.SET_NULL, null=True, blank=True)
+    curso = models.CharField(max_length=120)
+    nivel_ensino = models.CharField(max_length=20, choices=NivelEnsino.choices, default=NivelEnsino.SUPERIOR)
+    tipo_estagio = models.CharField(max_length=20, choices=TipoEstagio.choices)
+    data_inicio = models.DateField(null=True, blank=True)
+    data_fim = models.DateField(null=True, blank=True)
+    carga_horaria_diaria = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    carga_horaria_semanal = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    atividades = models.TextField(blank=True)
+    supervisor_nome = models.CharField(max_length=120, blank=True)
+    supervisor_formacao = models.CharField(max_length=120, blank=True)
+    professor_orientador = models.CharField(max_length=120, blank=True)
+    seguro_apolice = models.CharField(max_length=80, blank=True)
+    bolsa_auxilio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    auxilio_transporte = models.BooleanField(default=False)
+    plano_atividades = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f'Estagio de {self.usuario} em {self.empresa}'
+
+    def clean(self):
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            raise ValidationError({'data_fim': 'Data final nao pode ser anterior a data inicial.'})
+        if self.carga_horaria_diaria is not None and self.carga_horaria_diaria < 0:
+            raise ValidationError({'carga_horaria_diaria': 'Carga horaria diaria nao pode ser negativa.'})
+        if self.carga_horaria_semanal is not None and self.carga_horaria_semanal < 0:
+            raise ValidationError({'carga_horaria_semanal': 'Carga horaria semanal nao pode ser negativa.'})
+        if self.bolsa_auxilio is not None and self.bolsa_auxilio < 0:
+            raise ValidationError({'bolsa_auxilio': 'Bolsa-auxilio nao pode ser negativa.'})
+
+    @property
+    def duracao_em_dias(self):
+        if not self.data_inicio or not self.data_fim:
+            return None
+        return (self.data_fim - self.data_inicio).days
+
+    def _pendencia(self, codigo, severidade_padrao, mensagem):
+        regra = RegraValidacao.obter_config(codigo, severidade_padrao)
+        if regra is None:
+            return None
+        return {
+            'codigo_regra': codigo,
+            'regra': regra,
+            'severidade': regra.severidade_padrao,
+            'mensagem': mensagem,
+        }
+
+    def validar_regras_negocio(self):
+        pendencias = []
+
+        if self.carga_horaria_diaria is not None and self.carga_horaria_diaria > Decimal('6.00'):
+            pendencias.append(self._pendencia(
+                'CARGA_DIARIA',
+                SeveridadePendencia.ERRO,
+                'Carga horaria diaria acima de 6 horas.',
+            ))
+
+        if self.carga_horaria_semanal is not None and self.carga_horaria_semanal > Decimal('30.00'):
+            pendencias.append(self._pendencia(
+                'CARGA_SEMANAL',
+                SeveridadePendencia.ERRO,
+                'Carga horaria semanal acima de 30 horas.',
+            ))
+
+        if not self.seguro_apolice:
+            pendencias.append(self._pendencia(
+                'SEGURO',
+                SeveridadePendencia.ERRO,
+                'Seguro contra acidentes pessoais nao informado.',
+            ))
+
+        if not self.supervisor_nome:
+            pendencias.append(self._pendencia(
+                'SUPERVISOR',
+                SeveridadePendencia.PENDENCIA,
+                'Supervisor da empresa nao informado.',
+            ))
+
+        if not self.professor_orientador:
+            pendencias.append(self._pendencia(
+                'PROFESSOR_ORIENTADOR',
+                SeveridadePendencia.PENDENCIA,
+                'Professor orientador nao informado.',
+            ))
+
+        if not self.atividades and not self.plano_atividades:
+            pendencias.append(self._pendencia(
+                'ATIVIDADES',
+                SeveridadePendencia.PENDENCIA,
+                'Atividades ou plano de atividades nao informados.',
+            ))
+
+        if self.tipo_estagio == TipoEstagio.NAO_OBRIGATORIO:
+            if self.bolsa_auxilio is None or self.bolsa_auxilio <= 0:
+                pendencias.append(self._pendencia(
+                    'BOLSA',
+                    SeveridadePendencia.ERRO,
+                    'Estagio nao obrigatorio sem bolsa-auxilio.',
+                ))
+            if not self.auxilio_transporte:
+                pendencias.append(self._pendencia(
+                    'AUXILIO_TRANSPORTE',
+                    SeveridadePendencia.ERRO,
+                    'Estagio nao obrigatorio sem auxilio-transporte.',
+                ))
+
+        if self.duracao_em_dias is not None and self.duracao_em_dias > 730:
+            pendencias.append(self._pendencia(
+                'DURACAO_MAXIMA',
+                SeveridadePendencia.ERRO,
+                'Duracao do contrato acima de 2 anos.',
+            ))
+
+        return [pendencia for pendencia in pendencias if pendencia]
+
+    def status_validacao(self):
+        pendencias = self.validar_regras_negocio()
+        if any(item['severidade'] == SeveridadePendencia.ERRO for item in pendencias):
+            return ResultadoAnalise.REPROVADO
+        if pendencias:
+            return ResultadoAnalise.PENDENTE
+        return ResultadoAnalise.APROVADO
+
+
 class Contrato(models.Model):
     empresa = models.ForeignKey(Empresa, related_name='contratos', on_delete=models.CASCADE)
     usuario = models.ForeignKey(Usuario, related_name='contratos', on_delete=models.CASCADE)
     instituicao = models.ForeignKey(Instituicao, related_name='contratos', on_delete=models.SET_NULL, null=True, blank=True)
+    estagio = models.ForeignKey(Estagio, related_name='contratos', on_delete=models.SET_NULL, null=True, blank=True)
     data_submissao = models.DateTimeField(auto_now_add=True)
+    versao = models.PositiveIntegerField(default=1)
     arquivo_original = models.BinaryField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=StatusContrato.choices, default=StatusContrato.RECEBIDO)
     score_conformidade = models.FloatField(default=0.0)
@@ -58,6 +306,138 @@ class Contrato(models.Model):
     def atualizar_status(self, novo_status):
         self.status = novo_status
         self.save()
+
+    def save(self, *args, **kwargs):
+        if self.estagio:
+            self.usuario = self.estagio.usuario
+            self.empresa = self.estagio.empresa
+            self.instituicao = self.estagio.instituicao
+        super().save(*args, **kwargs)
+
+
+class AnaliseContrato(models.Model):
+    contrato = models.ForeignKey(Contrato, related_name='analises', on_delete=models.CASCADE)
+    resultado = models.CharField(max_length=20, choices=ResultadoAnalise.choices, default=ResultadoAnalise.PENDENTE)
+    score_conformidade = models.FloatField(default=0.0)
+    dados_extraidos = models.JSONField(default=dict, blank=True)
+    observacoes = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f'Analise {self.id} - contrato {self.contrato_id}'
+
+    @classmethod
+    def gerar_para_contrato(cls, contrato, dados_extraidos=None):
+        dados_extraidos = dados_extraidos or {}
+        analise = cls.objects.create(contrato=contrato, dados_extraidos=dados_extraidos)
+
+        if not contrato.estagio:
+            Pendencia.objects.create(
+                analise=analise,
+                codigo_regra='ESTAGIO',
+                severidade=SeveridadePendencia.PENDENCIA,
+                mensagem='Contrato sem cadastro de estagio vinculado.',
+            )
+        else:
+            for item in contrato.estagio.validar_regras_negocio():
+                Pendencia.objects.create(
+                    analise=analise,
+                    regra=item['regra'] if item['regra'].pk else None,
+                    codigo_regra=item['codigo_regra'],
+                    severidade=item['severidade'],
+                    mensagem=item['mensagem'],
+                )
+
+        analise.recalcular_resultado()
+        RelatorioConformidade.objects.create(
+            analise=analise,
+            status=analise.resultado,
+            conteudo=analise.resumo_textual(),
+        )
+        return analise
+
+    def recalcular_resultado(self):
+        pendencias = self.pendencias.all()
+        total_pendencias = pendencias.count()
+        total_erros = pendencias.filter(severidade=SeveridadePendencia.ERRO).count()
+
+        if total_erros:
+            self.resultado = ResultadoAnalise.REPROVADO
+        elif total_pendencias:
+            self.resultado = ResultadoAnalise.PENDENTE
+        else:
+            self.resultado = ResultadoAnalise.APROVADO
+
+        self.score_conformidade = max(0.0, 100.0 - (total_erros * 20.0) - ((total_pendencias - total_erros) * 10.0))
+        self.save(update_fields=['resultado', 'score_conformidade'])
+
+        contrato_status = {
+            ResultadoAnalise.APROVADO: StatusContrato.VALIDADO_OK,
+            ResultadoAnalise.PENDENTE: StatusContrato.INVALIDO_PENDENTE,
+            ResultadoAnalise.REPROVADO: StatusContrato.REPROVADO,
+        }[self.resultado]
+        self.contrato.status = contrato_status
+        self.contrato.score_conformidade = self.score_conformidade
+        self.contrato.save(update_fields=['status', 'score_conformidade'])
+
+    def resumo_textual(self):
+        linhas = [
+            f'Resultado: {self.resultado}',
+            f'Score de conformidade: {self.score_conformidade:.1f}',
+        ]
+        for pendencia in self.pendencias.all():
+            linhas.append(f'- [{pendencia.severidade}] {pendencia.mensagem}')
+        return '\n'.join(linhas)
+
+
+class Pendencia(models.Model):
+    analise = models.ForeignKey(AnaliseContrato, related_name='pendencias', on_delete=models.CASCADE)
+    regra = models.ForeignKey(RegraValidacao, related_name='pendencias', on_delete=models.SET_NULL, null=True, blank=True)
+    codigo_regra = models.CharField(max_length=50)
+    severidade = models.CharField(max_length=20, choices=SeveridadePendencia.choices)
+    mensagem = models.TextField()
+    resolvida = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['severidade', 'codigo_regra']
+
+    def __str__(self):
+        return f'{self.codigo_regra} - {self.severidade}'
+
+
+class RelatorioConformidade(models.Model):
+    analise = models.OneToOneField(AnaliseContrato, related_name='relatorio', on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=ResultadoAnalise.choices)
+    conteudo = models.TextField()
+    gerado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Relatorio da analise {self.analise_id}'
+
+
+class ParecerInstitucional(models.Model):
+    contrato = models.ForeignKey(Contrato, related_name='pareceres', on_delete=models.CASCADE)
+    instituicao = models.ForeignKey(Instituicao, related_name='pareceres', on_delete=models.CASCADE)
+    autor = models.CharField(max_length=120)
+    aprovado = models.BooleanField()
+    observacao = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f'Parecer {self.id} - contrato {self.contrato_id}'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.contrato.instituicao = self.instituicao
+        self.contrato.status = StatusContrato.APROVADO_FINAL if self.aprovado else StatusContrato.INVALIDO_PENDENTE
+        self.contrato.save(update_fields=['instituicao', 'status'])
 
 
 class SistemaValidador(models.Model):
@@ -70,7 +450,11 @@ class SistemaValidador(models.Model):
         return {}
 
     def validar_regras(self, dados):
-        return 0.0
+        analise = AnaliseContrato.gerar_para_contrato(self.contrato, dados_extraidos=dados)
+        return analise.score_conformidade
 
     def gerar_relatorio_validacao(self):
-        return 'Relatório de validação não implementado.'
+        analise = self.contrato.analises.first()
+        if not analise:
+            analise = AnaliseContrato.gerar_para_contrato(self.contrato)
+        return analise.relatorio.conteudo
