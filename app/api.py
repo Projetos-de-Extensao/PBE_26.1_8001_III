@@ -96,26 +96,31 @@ class LogoutAPIView(APIView):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
+    
 
 
 class EmpresaViewSet(viewsets.ModelViewSet):
     queryset = Empresa.objects.all()
     serializer_class = EmpresaSerializer
+    
 
 
 class InstituicaoViewSet(viewsets.ModelViewSet):
     queryset = Instituicao.objects.all()
     serializer_class = InstituicaoSerializer
+    
 
 
 class RegraValidacaoViewSet(viewsets.ModelViewSet):
     queryset = RegraValidacao.objects.all()
     serializer_class = RegraValidacaoSerializer
+    
 
 
 class EstagioViewSet(viewsets.ModelViewSet):
     queryset = Estagio.objects.select_related('usuario', 'empresa', 'instituicao')
     serializer_class = EstagioSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -132,6 +137,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
     queryset = Contrato.objects.select_related('usuario', 'empresa', 'instituicao', 'estagio')
     serializer_class = ContratoSerializer
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -160,6 +166,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
 class AnaliseContratoViewSet(viewsets.ModelViewSet):
     queryset = AnaliseContrato.objects.select_related('contrato').prefetch_related('pendencias')
     serializer_class = AnaliseContratoSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -172,6 +179,7 @@ class AnaliseContratoViewSet(viewsets.ModelViewSet):
 class PendenciaViewSet(viewsets.ModelViewSet):
     queryset = Pendencia.objects.select_related('analise', 'regra')
     serializer_class = PendenciaSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -187,6 +195,7 @@ class PendenciaViewSet(viewsets.ModelViewSet):
 class RelatorioConformidadeViewSet(viewsets.ModelViewSet):
     queryset = RelatorioConformidade.objects.select_related('analise')
     serializer_class = RelatorioConformidadeSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -199,6 +208,7 @@ class RelatorioConformidadeViewSet(viewsets.ModelViewSet):
 class ParecerInstitucionalViewSet(viewsets.ModelViewSet):
     queryset = ParecerInstitucional.objects.select_related('contrato', 'instituicao')
     serializer_class = ParecerInstitucionalSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -214,3 +224,4 @@ class ParecerInstitucionalViewSet(viewsets.ModelViewSet):
 class SistemaValidadorViewSet(viewsets.ModelViewSet):
     queryset = SistemaValidador.objects.select_related('contrato')
     serializer_class = SistemaValidadorSerializer
+    permission_classes = [permissions.IsAuthenticated]
