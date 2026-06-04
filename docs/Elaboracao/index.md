@@ -4,12 +4,21 @@ Objetivo: Refinar os requisitos, resolver os riscos críticos e definir a arquit
 
 ## Principais atividades:
 
-Detalhar os requisitos mais importantes.
+- Detalhar os requisitos mais importantes do backend VerificaEstagio.
+- Definir a arquitetura de dados e a estrutura de API.
+- Validar regras de negócio e casos de uso.
+- Planejar os próximos passos de implementação e testes.
 
-Desenvolver uma arquitetura de software robusta.
+## Status atual da elaboração
 
-Criar protótipos ou provas de conceito.
+- Modelos implementados: Usuário, Empresa, Instituição, Estágio, Contrato, Análise de Contrato, Pendência, Relatório de Conformidade, Parecer Institucional.
+- APIs implementadas: CRUD completo para os recursos principais e ações especiais de upload de PDF e análise de contrato.
+- Regras de negócio implementadas: carga horária, seguro, supervisor, professor orientador, plano de atividades, bolsa/auxílio, duração máxima.
 
-Planejar as próximas fases com mais precisão.
+## Pontos ainda em evolução
 
-Produto principal: Arquitetura validada e plano de desenvolvimento para a fase de construção.
+- Extração de dados de PDF via OCR ainda é stub.
+- Não há front-end nem telas de usuário definidas.
+- Não há envio de notificações ou alertas automáticos.
+- Ainda não existem documentos técnicos detalhados de arquitetura de deploy e infraestrutura.
+

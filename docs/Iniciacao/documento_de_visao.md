@@ -4,84 +4,104 @@ title: Documento de Visão
 ---
 ## Introdução
 
-<p align = "justify">
-O propósito deste documento é fornecer uma visão geral sobre o projeto que será realizado na disciplina Arquitetura e Desenho de Software 2020/1, na Universidade de Brasília. Sendo assim, Nesse documento serão descritas de maneira resumida as principais funcionalidades, usabilidades, o problema que será abordado e os objetivos da equipe.
-</p>
+O VerificaEstagio é um backend Django REST para cadastro e validação de contratos de estágio. Este documento descreve o problema, a proposta de solução, os objetivos do produto e os limites do sistema com base no que já foi implementado.
 
-## Descrição do Problema 
+## Descrição do problema
 
-<p align = "justify">
-Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.
-</p>
+A análise de contratos de estágio costuma ser manual, fragmentada entre aluno, empresa e instituição de ensino, e sujeita a erros de conformidade. Sem um fluxo automatizado, pendências essenciais podem passar despercebidas, atrasando a aprovação do estágio.
 
 ### Problema
 
-Dificuldade em gerenciar e organizar...
+Não existe um sistema centralizado que:
+- registre estágio e contrato de forma integrada;
+- valide regras obrigatórias de estágio (carga horária, seguro, supervisor, professor orientador e plano de atividades);
+- gere pendências e relatórios de conformidade;
+- permita emissão de parecer institucional sobre o contrato.
 
 ### Impactados
 
-Usuários....
+- Estudantes / usuários que precisam validar contratos de estágio;
+- Empresas que oferecem vagas de estágio;
+- Instituições de ensino responsáveis pela aprovação;
+- Coordenadores e analistas de estágio.
 
 ### Consequência
 
-A criação de novos....
+- Contratos podem ser aceitos sem requisitos legais completos;
+- pendências não são registradas nem monitoradas;
+- aprovações ficam dispersas entre sistemas diferentes;
+- falta transparência no status do processo.
 
 ### Solução
 
-Utilizar a aplicação que será desenvolvida visando resolver...
+Criar o VerificaEstagio como uma API para:
+- cadastrar usuários, empresas, instituições, estágios e contratos;
+- permitir upload de contratos em PDF;
+- aplicar regras de negócio definidas para análise de estágio;
+- gerar análises, pendências e relatórios de conformidade;
+- atualizar o status do contrato e registrar parecer institucional.
 
 ## Objetivos
 
-<p align = "justify">
-O objetivo da equipe de desenvolvimento é fornecer...
-</p>
+- Disponibilizar um backend funcional para gestão de contratos de estágio;
+- implementar validação automática de regras de estágio;
+- produzir análises e relatórios de conformidade;
+- suportar a emissão de parecer institucional;
+- fornecer uma base sólida para frontends ou integrações futuras.
 
-## Descrição do Usuário 
+## Descrição do usuário
 
-<p align = "justify">
-Os usuários serão....
-</p>
+Os usuários esperados são:
+- alunos/estagiários que submetem contratos;
+- responsáveis de empresas que cadastram ou associam contratos;
+- instituições de ensino que analisam e aprovam contratos;
+- analistas que consultam pendências e relatórios.
 
 ## Recursos do produto
 
-### Conta
+### Autenticação e cadastro
 
-<p align = "justify">
-O cliente poderá realizar seu cadastro....
-</p>
+- Registro de usuário Django.
+- Login e logout via sessão.
+- CRUD de usuários, empresas e instituições.
 
-### Loja
+### Gestão de estágio
 
-<p align = "justify">
-O cliente poderá cadastrar uma loja única....
-</p>
+- Cadastro de estágio vinculado a usuário, empresa e instituição.
+- Regras de validação para carga horária, seguro, supervisor, orientador e plano de atividades.
 
-### Produto
+### Gestão de contratos
 
-<p align = "justify">
-O cliente poderá cadastrar....
-</p>
+- Cadastro de contrato e relacionamento com estágio.
+- Upload de arquivo PDF validado.
+- Análise automática de conformidade e atualização de status.
 
-### Pesquisa sobre Lojas
+### Análise e relatórios
 
-<p align = "justify">
-O cliente poderá pesquisar...
-</p>
+- Criação de análises com resultado aprovado, pendente ou reprovado.
+- Geração de pendências detalhadas.
+- Geração de relatório textual de conformidade.
+
+### Parecer institucional
+
+- Registro de parecer de instituição de ensino.
+- Atualização do contrato para APROVADO_FINAL ou INVALIDO_PENDENTE.
 
 ## Restrições
 
-<p align = "justify">
-A aplicação não será responsável...
-</p>
+- Projeto atual é apenas backend; não existe frontend completo no repositório.
+- OCR de contrato está presente como stub e não realiza extração real de texto.
+- Arquivos de contrato devem ser enviados em formato PDF.
+- O banco de dados utilizado é SQLite por padrão.
+- Não há envio automático de notificações ou e-mails no código atualmente.
 
-## Referências Bibliográficas
+## Status atual
 
-> Documento de visão. Disponível em https://www... Acesso em dd/MM/yyYY
-
-> Documento de visão. Disponível em  Acesso em dd/MM/yyYY
+- Implementado: cadastro de recursos, autenticação, upload de PDF, análise automática, geração de pendências, relatório de conformidade, parecer institucional.
+- Em desenvolvimento ou não implementado: OCR real de documentos, notificações por e-mail, interface de usuário, confirmação de cadastro por e-mail, dashboard de acompanhamento.
 
 ## Versionamento
 | Data | Versão | Descrição | Autor(es) |
 | -- | -- | -- | -- |
-| DD/MM/YYYY | 1.0 | Criação do documento | XXX XXXX e ZZZ ZZZZ | 
+| 04/06/2026 | 1.0 | Documento de visão alinhado ao backend atual | Pedro Santos, Gabriel Melo, Bernardo Brandao, Iago Viana, Gabriel Maccachero | 
 
