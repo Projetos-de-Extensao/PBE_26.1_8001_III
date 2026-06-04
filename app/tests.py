@@ -8,6 +8,46 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+MINIMAL_PDF_BYTES = b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 73 >>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(CPF: 123.456.789-01) Tj
+0 -14 Td
+(CNPJ: 12.345.678/0001-91) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000121 00000 n 
+0000000210 00000 n 
+0000000295 00000 n 
+trailer
+<< /Root 1 0 R /Size 6 >>
+startxref
+378
+%%EOF
+"""
+
 from app.models import (
     AnaliseContrato,
     Contrato,
@@ -208,3 +248,36 @@ class ApiWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data['arquivo_pdf'].endswith('.pdf'))
+
+    def test_extrair_dados_ocr_pdf(self):
+        self.client.force_authenticate(user=self.auth_user)
+        arquivo = SimpleUploadedFile('contrato.pdf', MINIMAL_PDF_BYTES, content_type='application/pdf')
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': arquivo},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.contrato.refresh_from_db()
+
+        from app.models import SistemaValidador
+        sistema = SistemaValidador.objects.create(contrato=self.contrato)
+        dados = sistema.extrair_dados_ocr()
+
+        self.assertEqual(dados.get('cpf'), '123.456.789-01')
+        self.assertEqual(dados.get('cnpj'), '12.345.678/0001-91')
+
+    def test_analisar_contrato_usa_extracao_ocr_automaticamente(self):
+        self.client.force_authenticate(user=self.auth_user)
+        arquivo = SimpleUploadedFile('contrato.pdf', MINIMAL_PDF_BYTES, content_type='application/pdf')
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': arquivo},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(f'/api/contratos/{self.contrato.id}/analisar/', format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['dados_extraidos']['cpf'], '123.456.789-01')
+        self.assertEqual(response.data['dados_extraidos']['cnpj'], '12.345.678/0001-91')

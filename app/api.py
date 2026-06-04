@@ -149,7 +149,10 @@ class ContratoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def analisar(self, request, pk=None):
         contrato = self.get_object()
-        dados_extraidos = request.data.get('dados_extraidos', {})
+        dados_extraidos = request.data.get('dados_extraidos')
+        if dados_extraidos is None:
+            sistema, _ = SistemaValidador.objects.get_or_create(contrato=contrato)
+            dados_extraidos = sistema.extrair_dados_ocr()
         analise = AnaliseContrato.gerar_para_contrato(contrato, dados_extraidos=dados_extraidos)
         serializer = AnaliseContratoSerializer(analise)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
