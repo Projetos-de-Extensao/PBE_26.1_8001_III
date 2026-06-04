@@ -281,3 +281,29 @@ class ApiWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['dados_extraidos']['cpf'], '123.456.789-01')
         self.assertEqual(response.data['dados_extraidos']['cnpj'], '12.345.678/0001-91')
+
+    def test_analisar_contrato_gera_pendencias_quando_dados_extraidos_nao_batem_com_estagio(self):
+        self.client.force_authenticate(user=self.auth_user)
+        dados_extraidos = {
+            'curso': 'Engenharia de Software',
+            'tipo_estagio': TipoEstagio.NAO_OBRIGATORIO,
+            'data_inicio': date(2026, 1, 1),
+            'data_fim': date(2026, 12, 31),
+            'carga_horaria_diaria': Decimal('6.00'),
+            'carga_horaria_semanal': Decimal('30.00'),
+            'seguro_apolice': 'APOLICE-999',
+            'supervisor_nome': 'Supervisor Diferente',
+            'professor_orientador': 'Orientador Teste',
+        }
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/analisar/',
+            {'dados_extraidos': dados_extraidos},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        codigos = {pendencia['codigo_regra'] for pendencia in response.data['pendencias']}
+        self.assertIn('CURSO', codigos)
+        self.assertIn('TIPO_ESTAGIO', codigos)
+        self.assertIn('SUPERVISOR', codigos)

@@ -132,6 +132,30 @@ class RegraValidacao(models.Model):
                 'severidade_padrao': SeveridadePendencia.PENDENCIA,
             },
             {
+                'codigo': 'CURSO',
+                'nome': 'Curso',
+                'descricao': 'Curso do contrato deve coincidir com o curso cadastrado no estágio.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'TIPO_ESTAGIO',
+                'nome': 'Tipo de estágio',
+                'descricao': 'Tipo de estágio do documento deve coincidir com o tipo cadastrado.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'DATA_INICIO',
+                'nome': 'Data de início',
+                'descricao': 'Data de início do contrato deve coincidir entre o documento e o cadastro.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'DATA_FIM',
+                'nome': 'Data de fim',
+                'descricao': 'Data de fim do contrato deve coincidir entre o documento e o cadastro.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
                 'codigo': 'BOLSA',
                 'nome': 'Bolsa-auxilio',
                 'descricao': 'Estagio nao obrigatorio exige bolsa-auxilio.',
@@ -337,6 +361,128 @@ class AnaliseContrato(models.Model):
         return f'Analise {self.id} - contrato {self.contrato_id}'
 
     @classmethod
+    def _normalizar_str(cls, valor):
+        if valor is None:
+            return None
+        return str(valor).strip().lower()
+
+    @classmethod
+    def _valores_iguais(cls, valor_pdf, valor_estagio):
+        if valor_pdf is None or valor_estagio is None:
+            return False
+        if isinstance(valor_pdf, str) or isinstance(valor_estagio, str):
+            return cls._normalizar_str(valor_pdf) == cls._normalizar_str(valor_estagio)
+        return valor_pdf == valor_estagio
+
+    @classmethod
+    def _pendencia_por_comparacao(cls, codigo, severidade_padrao, mensagem):
+        regra = RegraValidacao.obter_config(codigo, severidade_padrao)
+        if regra is None:
+            return None
+        return {
+            'codigo_regra': codigo,
+            'regra': regra,
+            'severidade': regra.severidade_padrao,
+            'mensagem': mensagem,
+        }
+
+    @classmethod
+    def _comparar_dados_extraidos(cls, estagio, dados_extraidos):
+        if not dados_extraidos:
+            return []
+
+        pendencias = []
+        if dados_extraidos.get('curso') and estagio.curso:
+            if not cls._valores_iguais(dados_extraidos.get('curso'), estagio.curso):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'CURSO',
+                    SeveridadePendencia.PENDENCIA,
+                    'Curso do documento diverge do curso cadastrado no estágio.',
+                ))
+
+        if dados_extraidos.get('tipo_estagio') and estagio.tipo_estagio:
+            if not cls._valores_iguais(dados_extraidos.get('tipo_estagio'), estagio.tipo_estagio):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'TIPO_ESTAGIO',
+                    SeveridadePendencia.PENDENCIA,
+                    'Tipo de estágio do documento diverge do tipo cadastrado.',
+                ))
+
+        if dados_extraidos.get('data_inicio') and estagio.data_inicio:
+            if not cls._valores_iguais(dados_extraidos.get('data_inicio'), estagio.data_inicio):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'DATA_INICIO',
+                    SeveridadePendencia.PENDENCIA,
+                    'Data de início do documento diverge da data cadastrada.',
+                ))
+
+        if dados_extraidos.get('data_fim') and estagio.data_fim:
+            if not cls._valores_iguais(dados_extraidos.get('data_fim'), estagio.data_fim):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'DATA_FIM',
+                    SeveridadePendencia.PENDENCIA,
+                    'Data de fim do documento diverge da data cadastrada.',
+                ))
+
+        if dados_extraidos.get('carga_horaria_diaria') is not None and estagio.carga_horaria_diaria is not None:
+            if not cls._valores_iguais(dados_extraidos.get('carga_horaria_diaria'), estagio.carga_horaria_diaria):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'CARGA_DIARIA',
+                    SeveridadePendencia.ERRO,
+                    'Carga horaria diaria do documento diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('carga_horaria_semanal') is not None and estagio.carga_horaria_semanal is not None:
+            if not cls._valores_iguais(dados_extraidos.get('carga_horaria_semanal'), estagio.carga_horaria_semanal):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'CARGA_SEMANAL',
+                    SeveridadePendencia.ERRO,
+                    'Carga horaria semanal do documento diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('seguro_apolice') and estagio.seguro_apolice:
+            if not cls._valores_iguais(dados_extraidos.get('seguro_apolice'), estagio.seguro_apolice):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'SEGURO',
+                    SeveridadePendencia.ERRO,
+                    'Numero de apolice de seguro diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('supervisor_nome') and estagio.supervisor_nome:
+            if not cls._valores_iguais(dados_extraidos.get('supervisor_nome'), estagio.supervisor_nome):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'SUPERVISOR',
+                    SeveridadePendencia.PENDENCIA,
+                    'Nome do supervisor no documento diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('professor_orientador') and estagio.professor_orientador:
+            if not cls._valores_iguais(dados_extraidos.get('professor_orientador'), estagio.professor_orientador):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'PROFESSOR_ORIENTADOR',
+                    SeveridadePendencia.PENDENCIA,
+                    'Professor orientador no documento diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('bolsa_auxilio') is not None and estagio.bolsa_auxilio is not None:
+            if not cls._valores_iguais(dados_extraidos.get('bolsa_auxilio'), estagio.bolsa_auxilio):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'BOLSA',
+                    SeveridadePendencia.ERRO,
+                    'Valor de bolsa-auxilio no documento diverge do cadastro.',
+                ))
+
+        if dados_extraidos.get('auxilio_transporte') is not None and estagio.auxilio_transporte is not None:
+            if not cls._valores_iguais(dados_extraidos.get('auxilio_transporte'), estagio.auxilio_transporte):
+                pendencias.append(cls._pendencia_por_comparacao(
+                    'AUXILIO_TRANSPORTE',
+                    SeveridadePendencia.ERRO,
+                    'Valor de auxilio-transporte no documento diverge do cadastro.',
+                ))
+
+        return [pendencia for pendencia in pendencias if pendencia]
+
+    @classmethod
     def gerar_para_contrato(cls, contrato, dados_extraidos=None):
         if dados_extraidos is None:
             dados_extraidos = {}
@@ -346,6 +492,7 @@ class AnaliseContrato(models.Model):
                 sistema = None
             if sistema:
                 dados_extraidos = sistema.extrair_dados_ocr() or {}
+
         analise = cls.objects.create(contrato=contrato, dados_extraidos=dados_extraidos)
 
         if not contrato.estagio:
@@ -356,10 +503,14 @@ class AnaliseContrato(models.Model):
                 mensagem='Contrato sem cadastro de estagio vinculado.',
             )
         else:
-            for item in contrato.estagio.validar_regras_negocio():
+            comparacoes = contrato.estagio.validar_regras_negocio()
+            comparacoes.extend(cls._comparar_dados_extraidos(contrato.estagio, dados_extraidos))
+            for item in comparacoes:
+                if not item:
+                    continue
                 Pendencia.objects.create(
                     analise=analise,
-                    regra=item['regra'] if item['regra'].pk else None,
+                    regra=item['regra'] if getattr(item['regra'], 'pk', None) else None,
                     codigo_regra=item['codigo_regra'],
                     severidade=item['severidade'],
                     mensagem=item['mensagem'],
