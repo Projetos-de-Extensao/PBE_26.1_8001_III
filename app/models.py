@@ -1,8 +1,11 @@
 from decimal import Decimal
+import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class Usuario(models.Model):
@@ -670,13 +673,17 @@ class AnaliseContrato(models.Model):
         self.contrato.atualizar_status(contrato_status)
         self.contrato.score_conformidade = self.score_conformidade
         self.contrato.save(update_fields=['score_conformidade'])
-        RelatorioConformidade.objects.update_or_create(
-            analise=self,
-            defaults={
-                'status': self.resultado,
-                'conteudo': self.resumo_textual(),
-            },
-        )
+        try:
+            RelatorioConformidade.objects.update_or_create(
+                analise=self,
+                defaults={
+                    'status': self.resultado,
+                    'conteudo': self.resumo_textual(),
+                },
+            )
+        except Exception:
+            logger.exception('Erro inesperado ao atualizar relatorio da analise: analise_id=%s', self.id)
+            raise
 
     def resumo_textual(self):
         linhas = [

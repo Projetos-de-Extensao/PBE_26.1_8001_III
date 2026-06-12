@@ -152,6 +152,35 @@ class BackendHardeningTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
 
+    def test_usuario_nao_autenticado_nao_acessa_dados_sensiveis(self):
+        endpoints = [
+            '/api/contratos/',
+            '/api/estagios/',
+            '/api/analises/',
+            '/api/pendencias/',
+            '/api/relatorios/',
+            '/api/me/',
+            '/api/dashboard/',
+        ]
+
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(endpoint)
+                self.assertIn(response.status_code, [401, 403])
+
+    def test_admin_consegue_editar_recurso_administrativo(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.patch(
+            f'/api/empresas/{self.empresa.id}/',
+            {'responsavel': 'Responsavel Admin'},
+            format='json',
+        )
+
+        self.empresa.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.empresa.responsavel, 'Responsavel Admin')
+
     def test_usuario_comum_nao_cria_analise_direta(self):
         self.client.force_authenticate(user=self.auth_user)
 
@@ -240,6 +269,32 @@ class BackendHardeningTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('errors', response.data)
+
+    def test_rejeita_pdf_vazio(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': self.pdf_upload(conteudo=b'')},
+            format='multipart',
+        )
+
+        self.contrato.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.contrato.versoes_pdf.count(), 0)
+
+    @override_settings(CONTRATO_PDF_MAX_SIZE=10)
+    def test_rejeita_pdf_acima_do_tamanho_maximo(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': self.pdf_upload(conteudo=MINIMAL_PDF_BYTES)},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.contrato.versoes_pdf.count(), 0)
 
     def test_upload_corrompido_nao_altera_versao_ou_status(self):
         self.client.force_authenticate(user=self.auth_user)
@@ -436,6 +491,51 @@ class BackendHardeningTests(TestCase):
         self.assertEqual(user.perfil.nome, 'Carol Teste')
         self.assertEqual(user.perfil.cpf, '111.222.333-44')
 
+    def test_registro_rejeita_email_duplicado(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'emailduplicado',
+                'email': 'alice@example.com',
+                'password': 'senha123',
+                'cpf': '333.444.555-66',
+                'nome': 'Email Duplicado',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_registro_rejeita_cpf_duplicado(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'cpfduplicado',
+                'email': 'cpfduplicado@example.com',
+                'password': 'senha123',
+                'cpf': '123.456.789-01',
+                'nome': 'CPF Duplicado',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_registro_rejeita_campos_obrigatorios_vazios(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': '',
+                'email': '',
+                'password': '',
+                'cpf': '',
+                'nome': '',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
     def test_endpoint_me_retorna_perfil_para_usuario_recadastrado(self):
         self.client.post(
             '/api/auth/register/',
@@ -485,6 +585,113 @@ class BackendHardeningTests(TestCase):
         self.contrato.refresh_from_db()
         self.assertEqual(response.status_code, 201)
         self.assertEqual(self.contrato.status, StatusContrato.VALIDADO_OK)
+
+    def test_fluxo_principal_via_api(self):
+        register_response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'fluxo',
+                'email': 'fluxo@example.com',
+                'password': 'senha123',
+                'cpf': '444.555.666-77',
+                'nome': 'Usuario Fluxo',
+            },
+            format='json',
+        )
+        self.assertEqual(register_response.status_code, 201)
+
+        login_response = self.client.post(
+            '/api/auth/login/',
+            {'username': 'fluxo', 'password': 'senha123'},
+            format='json',
+        )
+        self.assertEqual(login_response.status_code, 200)
+        user = AuthUser.objects.get(username='fluxo')
+        perfil = user.perfil
+
+        estagio_response = self.client.post(
+            '/api/estagios/',
+            {
+                'empresa': self.empresa.id,
+                'instituicao': self.instituicao.id,
+                'curso': 'Direito',
+                'tipo_estagio': TipoEstagio.OBRIGATORIO,
+                'data_inicio': '2026-01-01',
+                'data_fim': '2026-12-31',
+                'carga_horaria_diaria': '6.00',
+                'carga_horaria_semanal': '30.00',
+                'atividades': 'Desenvolvimento acompanhado de sistemas internos.',
+                'supervisor_nome': 'Carlos Supervisor',
+                'professor_orientador': 'Ana Orientadora',
+                'seguro_apolice': 'APOLICE-123',
+            },
+            format='json',
+        )
+        self.assertEqual(estagio_response.status_code, 201)
+
+        contrato_response = self.client.post(
+            '/api/contratos/',
+            {
+                'empresa': self.empresa.id,
+                'instituicao': self.instituicao.id,
+                'estagio': estagio_response.data['id'],
+            },
+            format='json',
+        )
+        self.assertEqual(contrato_response.status_code, 201)
+        contrato_id = contrato_response.data['id']
+        contrato = Contrato.objects.get(id=contrato_id)
+        self.assertEqual(contrato.usuario, perfil)
+
+        upload_response = self.client.post(
+            f'/api/contratos/{contrato_id}/upload-pdf/',
+            {'arquivo_pdf': self.pdf_upload('fluxo.pdf')},
+            format='multipart',
+        )
+        self.assertEqual(upload_response.status_code, 200)
+        self.assertEqual(upload_response.data['versao'], 1)
+        self.assertEqual(VersaoContrato.objects.filter(contrato_id=contrato_id).count(), 1)
+
+        analise_response = self.client.post(f'/api/contratos/{contrato_id}/analisar/', format='json')
+        self.assertEqual(analise_response.status_code, 201)
+        analise_id = analise_response.data['id']
+
+        pendencias_response = self.client.get('/api/pendencias/', {'analise': analise_id})
+        self.assertEqual(pendencias_response.status_code, 200)
+        self.assertGreaterEqual(len(pendencias_response.data), 1)
+
+        pendencia_id = pendencias_response.data[0]['id']
+        resolver_response = self.client.patch(
+            f'/api/pendencias/{pendencia_id}/',
+            {'resolvida': True},
+            format='json',
+        )
+        self.assertEqual(resolver_response.status_code, 200)
+
+        relatorios_response = self.client.get('/api/relatorios/', {'analise': analise_id})
+        self.assertEqual(relatorios_response.status_code, 200)
+        self.assertEqual(len(relatorios_response.data), 1)
+
+        self.client.force_authenticate(user=self.admin)
+        contrato.refresh_from_db()
+        if contrato.status == StatusContrato.INVALIDO_PENDENTE:
+            for pendencia in contrato.analises.get(id=analise_id).pendencias.filter(resolvida=False):
+                pendencia.resolvida = True
+                pendencia.save()
+            contrato.refresh_from_db()
+        parecer_response = self.client.post(
+            '/api/pareceres/',
+            {
+                'contrato': contrato_id,
+                'instituicao': self.instituicao.id,
+                'autor': 'Maria Coordenadora',
+                'aprovado': True,
+            },
+            format='json',
+        )
+        self.assertEqual(parecer_response.status_code, 201)
+        contrato.refresh_from_db()
+        self.assertEqual(contrato.status, StatusContrato.APROVADO_FINAL)
 
     def test_endpoint_me(self):
         self.client.force_authenticate(user=self.auth_user)

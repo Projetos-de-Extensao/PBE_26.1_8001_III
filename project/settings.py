@@ -135,6 +135,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+CONTRATO_PDF_MAX_SIZE = int(os.environ.get('CONTRATO_PDF_MAX_SIZE', 10 * 1024 * 1024))
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',

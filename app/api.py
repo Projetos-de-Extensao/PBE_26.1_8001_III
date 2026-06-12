@@ -1,6 +1,9 @@
+import logging
+
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg, Count, Q
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework import mixins, parsers, permissions, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -36,6 +39,8 @@ from app.serializers import (
     SistemaValidadorSerializer,
     UsuarioSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _aplicar_filtro_id(queryset, params, campo):
@@ -90,6 +95,7 @@ class RegisterAPIView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        logger.info('Usuario cadastrado: user_id=%s username=%s', user.id, user.username)
         return Response(
             {'id': user.id, 'username': user.username, 'email': user.email},
             status=status.HTTP_201_CREATED,
@@ -224,6 +230,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def analisar(self, request, pk=None):
         contrato = self.get_object()
+        logger.info('Inicio de analise do contrato: contrato_id=%s user_id=%s', contrato.id, request.user.id)
         dados_extraidos = request.data.get('dados_extraidos')
         try:
             if dados_extraidos is None:
@@ -232,7 +239,15 @@ class ContratoViewSet(viewsets.ModelViewSet):
             analise = AnaliseContrato.gerar_para_contrato(contrato, dados_extraidos=dados_extraidos)
         except DjangoValidationError as exc:
             mensagem = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
-            return Response({'detail': mensagem}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning('Analise rejeitada: contrato_id=%s erro=%s', contrato.id, mensagem)
+            return Response({'error': mensagem}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception('Erro inesperado na analise do contrato: contrato_id=%s', contrato.id)
+            return Response(
+                {'error': 'Erro inesperado ao analisar contrato.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        logger.info('Fim de analise do contrato: contrato_id=%s analise_id=%s', contrato.id, analise.id)
         serializer = AnaliseContratoSerializer(analise)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -241,12 +256,21 @@ class ContratoViewSet(viewsets.ModelViewSet):
         contrato = self.get_object()
         arquivo_enviado = request.FILES.get('arquivo_pdf')
         if not arquivo_enviado:
+            logger.warning('Upload de PDF rejeitado sem arquivo: contrato_id=%s user_id=%s', contrato.id, request.user.id)
             return Response(
-                {'detail': 'Envie um arquivo no campo arquivo_pdf.'},
+                {'error': 'Envie um arquivo no campo arquivo_pdf.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         serializer = self.get_serializer(contrato, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except DRFValidationError:
+            logger.warning(
+                'Upload de PDF rejeitado por validacao: contrato_id=%s arquivo=%s',
+                contrato.id,
+                arquivo_enviado.name,
+            )
+            raise
         contrato = serializer.save()
         numero_versao = contrato.versao
         while VersaoContrato.objects.filter(contrato=contrato, numero_versao=numero_versao).exists():
@@ -264,6 +288,12 @@ class ContratoViewSet(viewsets.ModelViewSet):
             enviado_por=request.user if request.user.is_authenticated else None,
         )
         versao.arquivo_pdf.save(arquivo_enviado.name, arquivo_enviado, save=True)
+        logger.info(
+            'Nova versao de contrato criada: contrato_id=%s versao=%s user_id=%s',
+            contrato.id,
+            numero_versao,
+            request.user.id,
+        )
         return Response(self.get_serializer(contrato).data)
 
 

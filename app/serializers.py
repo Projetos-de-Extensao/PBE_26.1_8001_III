@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.conf import settings
 from django.db import transaction
 from rest_framework import serializers
 
@@ -130,6 +131,11 @@ class ContratoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('O contrato deve ser enviado em formato PDF.')
         if arquivo and getattr(arquivo, 'content_type', None) not in [None, 'application/pdf']:
             raise serializers.ValidationError('O arquivo enviado nao parece ser um PDF.')
+        if arquivo and getattr(arquivo, 'size', 0) == 0:
+            raise serializers.ValidationError('O arquivo PDF enviado esta vazio.')
+        if arquivo and getattr(arquivo, 'size', 0) > settings.CONTRATO_PDF_MAX_SIZE:
+            limite_mb = settings.CONTRATO_PDF_MAX_SIZE / (1024 * 1024)
+            raise serializers.ValidationError(f'O PDF deve ter no maximo {limite_mb:.0f} MB.')
         if arquivo:
             try:
                 extrair_texto_pdf(arquivo)
