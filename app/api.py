@@ -97,7 +97,12 @@ class RegisterAPIView(APIView):
         user = serializer.save()
         logger.info('Usuario cadastrado: user_id=%s username=%s', user.id, user.username)
         return Response(
-            {'id': user.id, 'username': user.username, 'email': user.email},
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'perfil': UsuarioSerializer(user.perfil).data,
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -339,7 +344,7 @@ class PendenciaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
         if kwargs.get('partial'):
             return super().update(request, *args, **kwargs)
         return Response(
-            {'detail': 'Use PATCH e envie apenas o campo resolvida.'},
+            {'error': 'Use PATCH e envie apenas o campo resolvida.'},
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
@@ -347,10 +352,17 @@ class PendenciaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
         campos_permitidos = {'resolvida'}
         if set(request.data.keys()) - campos_permitidos:
             return Response(
-                {'detail': 'Apenas o campo resolvida pode ser alterado.'},
+                {'error': 'Apenas o campo resolvida pode ser alterado.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        logger.info(
+            'Pendencia atualizada: pendencia_id=%s resolvida=%s user_id=%s',
+            response.data.get('id'),
+            response.data.get('resolvida'),
+            request.user.id,
+        )
+        return response
 
 
 class RelatorioConformidadeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -390,6 +402,16 @@ class ParecerInstitucionalViewSet(viewsets.ModelViewSet):
         if aprovado is not None:
             queryset = queryset.filter(aprovado=aprovado)
         return _aplicar_filtro_data(queryset, params, 'criado_em')
+
+    def perform_create(self, serializer):
+        parecer = serializer.save()
+        logger.info(
+            'Parecer institucional criado: parecer_id=%s contrato_id=%s aprovado=%s user_id=%s',
+            parecer.id,
+            parecer.contrato_id,
+            parecer.aprovado,
+            self.request.user.id,
+        )
 
 
 class SistemaValidadorViewSet(viewsets.ReadOnlyModelViewSet):

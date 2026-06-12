@@ -50,6 +50,8 @@ $env:DJANGO_CSRF_TRUSTED_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
 $env:CONTRATO_PDF_MAX_SIZE="10485760"
 ```
 
+O arquivo `.env.example` na raiz do projeto lista essas variaveis com valores seguros para desenvolvimento. Use-o como referencia para criar um `.env` local. O `.env` real fica fora do Git.
+
 Em desenvolvimento, se `DJANGO_DEBUG=true` e `DJANGO_SECRET_KEY` nao existir, o projeto usa uma chave fixa apenas para dev. Em producao (`DJANGO_DEBUG=false`), `DJANGO_SECRET_KEY` e obrigatoria.
 
 ## Banco de Dados
@@ -89,6 +91,20 @@ python manage.py check
 python manage.py makemigrations --check
 python manage.py test
 ```
+
+## GitHub Actions
+
+O workflow `.github/workflows/django-tests.yml` executa automaticamente em push para `main` e em pull requests para `main`.
+
+Ele roda:
+
+```powershell
+python manage.py check
+python manage.py makemigrations --check
+python manage.py test
+```
+
+O workflow configura variaveis de ambiente de teste, instala o `requirements.txt` e falha se qualquer comando retornar erro.
 
 ## Fluxo Principal
 
@@ -150,6 +166,15 @@ O upload de contrato aceita apenas PDFs:
 - com texto extraivel.
 
 Cada upload valido cria uma nova `VersaoContrato` com copia propria do arquivo enviado. Upload invalido nao incrementa versao nem altera status.
+
+## Decisoes Tecnicas da Etapa 1
+
+- Analises, relatorios e sistemas validadores sao somente leitura pela API direta.
+- A analise deve ser criada pela action `POST /api/contratos/{id}/analisar/`.
+- Parecer institucional e restrito a staff/admin nesta etapa.
+- Empresas e instituicoes sao administradas por staff/admin.
+- PDFs possuem versionamento por `VersaoContrato`, com copia do arquivo enviado em cada versao.
+- A analise automatica ajuda na triagem, mas nao substitui revisao humana/institucional.
 
 ## Status da Etapa 1
 

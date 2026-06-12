@@ -322,6 +322,7 @@ class BackendHardeningTests(TestCase):
 
         self.contrato.refresh_from_db()
         self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
         self.assertEqual(self.contrato.versao, 1)
         self.assertEqual(self.contrato.versoes_pdf.count(), 0)
 
@@ -452,6 +453,7 @@ class BackendHardeningTests(TestCase):
 
         pendencia.refresh_from_db()
         self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
         self.assertEqual(pendencia.mensagem, 'Revisar seguro.')
         self.assertEqual(pendencia.severidade, SeveridadePendencia.PENDENCIA)
 
@@ -488,6 +490,8 @@ class BackendHardeningTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         user = AuthUser.objects.get(username='carol')
+        self.assertEqual(response.data['perfil']['id'], user.perfil.id)
+        self.assertEqual(response.data['perfil']['cpf'], '111.222.333-44')
         self.assertEqual(user.perfil.nome, 'Carol Teste')
         self.assertEqual(user.perfil.cpf, '111.222.333-44')
 
