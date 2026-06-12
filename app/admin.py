@@ -12,6 +12,7 @@ from .models import (
     RelatorioConformidade,
     SistemaValidador,
     Usuario,
+    VersaoContrato,
 )
 
 
@@ -83,3 +84,10 @@ class ParecerInstitucionalAdmin(admin.ModelAdmin):
 @admin.register(SistemaValidador)
 class SistemaValidadorAdmin(admin.ModelAdmin):
     list_display = ['id', 'contrato']
+
+
+@admin.register(VersaoContrato)
+class VersaoContratoAdmin(admin.ModelAdmin):
+    list_display = ['contrato', 'numero_versao', 'enviado_por', 'criado_em']
+    list_filter = ['criado_em']
+    search_fields = ['contrato__usuario__nome', 'contrato__empresa__razao_social']

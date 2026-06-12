@@ -14,14 +14,18 @@ from app.models import (
     RelatorioConformidade,
     SistemaValidador,
     Usuario,
+    VersaoContrato,
 )
+from app.services import PDFExtractionError, extrair_texto_pdf
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+
     class Meta:
         model = Usuario
-        fields = ['id', 'cpf', 'nome', 'email']
-        read_only_fields = ['id']
+        fields = ['id', 'user', 'username', 'cpf', 'nome', 'email']
+        read_only_fields = ['id', 'user', 'username']
 
 
 class EmpresaSerializer(serializers.ModelSerializer):
@@ -83,7 +87,7 @@ class EstagioSerializer(serializers.ModelSerializer):
             'criado_em',
             'atualizado_em',
         ]
-        read_only_fields = ['id', 'status_validacao', 'criado_em', 'atualizado_em']
+        read_only_fields = ['id', 'usuario', 'status_validacao', 'criado_em', 'atualizado_em']
 
     def validate(self, data):
         data_inicio = data.get('data_inicio', getattr(self.instance, 'data_inicio', None))
@@ -100,6 +104,8 @@ class EstagioSerializer(serializers.ModelSerializer):
 
 
 class ContratoSerializer(serializers.ModelSerializer):
+    versoes_pdf = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+
     class Meta:
         model = Contrato
         fields = [
@@ -110,19 +116,47 @@ class ContratoSerializer(serializers.ModelSerializer):
             'estagio',
             'data_submissao',
             'versao',
-            'arquivo_original',
             'arquivo_pdf',
             'status',
             'score_conformidade',
+            'versoes_pdf',
         ]
-        read_only_fields = ['id', 'data_submissao', 'status', 'score_conformidade']
+        read_only_fields = ['id', 'usuario', 'data_submissao', 'versao', 'status', 'score_conformidade', 'versoes_pdf']
 
     def validate_arquivo_pdf(self, arquivo):
         if arquivo and not arquivo.name.lower().endswith('.pdf'):
             raise serializers.ValidationError('O contrato deve ser enviado em formato PDF.')
         if arquivo and getattr(arquivo, 'content_type', None) not in [None, 'application/pdf']:
             raise serializers.ValidationError('O arquivo enviado nao parece ser um PDF.')
+        if arquivo:
+            try:
+                extrair_texto_pdf(arquivo)
+            except PDFExtractionError as exc:
+                raise serializers.ValidationError(exc.messages[0]) from exc
         return arquivo
+
+    def validate_estagio(self, estagio):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and not request.user.is_staff:
+            perfil = getattr(request.user, 'perfil', None)
+            if not perfil or estagio.usuario_id != perfil.id:
+                raise serializers.ValidationError('Estagio nao pertence ao usuario autenticado.')
+        return estagio
+
+    def update(self, instance, validated_data):
+        novo_pdf = validated_data.get('arquivo_pdf')
+        if novo_pdf:
+            instance.versao = instance.versao + 1 if instance.arquivo_pdf else 1
+            instance.status = 'RECEBIDO'
+            instance.score_conformidade = 0.0
+        return super().update(instance, validated_data)
+
+
+class VersaoContratoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VersaoContrato
+        fields = ['id', 'contrato', 'arquivo_pdf', 'numero_versao', 'enviado_por', 'criado_em']
+        read_only_fields = ['id', 'contrato', 'numero_versao', 'enviado_por', 'criado_em']
 
 
 class PendenciaSerializer(serializers.ModelSerializer):
@@ -174,6 +208,14 @@ class ParecerInstitucionalSerializer(serializers.ModelSerializer):
         fields = ['id', 'contrato', 'instituicao', 'autor', 'aprovado', 'observacao', 'criado_em']
         read_only_fields = ['id', 'criado_em']
 
+    def validate(self, data):
+        instance = ParecerInstitucional(**data)
+        try:
+            instance.clean()
+        except Exception as exc:
+            raise serializers.ValidationError(getattr(exc, 'message_dict', str(exc)))
+        return data
+
 
 class SistemaValidadorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -184,17 +226,28 @@ class SistemaValidadorSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    cpf = serializers.CharField(write_only=True, required=False)
+    nome = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password']
+        fields = ['id', 'username', 'email', 'password', 'cpf', 'nome']
         read_only_fields = ['id']
 
     def create(self, validated_data):
         password = validated_data.pop('password')
+        cpf = validated_data.pop('cpf', None)
+        nome = validated_data.pop('nome', None)
         user = User(**validated_data)
         user.set_password(password)
         user.save()
+        if cpf:
+            Usuario.objects.create(
+                user=user,
+                cpf=cpf,
+                nome=nome or user.username,
+                email=user.email,
+            )
         return user
 
     def validate_username(self, value):

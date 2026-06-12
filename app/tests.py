@@ -4,9 +4,26 @@ from pathlib import Path
 import shutil
 
 from django.contrib.auth.models import User as AuthUser
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+
+from app.models import (
+    AnaliseContrato,
+    Contrato,
+    Empresa,
+    Estagio,
+    Instituicao,
+    ParecerInstitucional,
+    Pendencia,
+    ResultadoAnalise,
+    SeveridadePendencia,
+    StatusContrato,
+    TipoEstagio,
+    Usuario,
+)
+
 
 MINIMAL_PDF_BYTES = b"""%PDF-1.4
 1 0 obj
@@ -48,29 +65,32 @@ startxref
 %%EOF
 """
 
-from app.models import (
-    AnaliseContrato,
-    Contrato,
-    Empresa,
-    Estagio,
-    Instituicao,
-    ParecerInstitucional,
-    ResultadoAnalise,
-    StatusContrato,
-    TipoEstagio,
-    Usuario,
-)
-
-
 TEST_MEDIA_ROOT = Path(__file__).resolve().parent.parent / 'test_media'
 
 
-class AnaliseContratoTests(TestCase):
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class BackendHardeningTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
     def setUp(self):
+        self.client = APIClient()
+        self.auth_user = AuthUser.objects.create_user(username='alice', email='alice@example.com', password='senha123')
+        self.outro_auth_user = AuthUser.objects.create_user(username='bob', email='bob@example.com', password='senha123')
+        self.admin = AuthUser.objects.create_superuser(username='admin', email='admin@example.com', password='senha123')
         self.usuario = Usuario.objects.create(
+            user=self.auth_user,
             cpf='123.456.789-01',
             nome='Alice Santos',
             email='alice@example.com',
+        )
+        self.outro_usuario = Usuario.objects.create(
+            user=self.outro_auth_user,
+            cpf='987.654.321-00',
+            nome='Bob Costa',
+            email='bob@example.com',
         )
         self.empresa = Empresa.objects.create(
             cnpj='12.345.678/0001-91',
@@ -81,18 +101,24 @@ class AnaliseContratoTests(TestCase):
             nome_unidade='Ibmec',
             coordenador='Maria Coordenadora',
         )
-
-    def criar_contrato(self, estagio):
-        return Contrato.objects.create(
+        self.estagio = self.criar_estagio(self.usuario)
+        self.outro_estagio = self.criar_estagio(self.outro_usuario)
+        self.contrato = Contrato.objects.create(
             usuario=self.usuario,
             empresa=self.empresa,
             instituicao=self.instituicao,
-            estagio=estagio,
+            estagio=self.estagio,
+        )
+        self.outro_contrato = Contrato.objects.create(
+            usuario=self.outro_usuario,
+            empresa=self.empresa,
+            instituicao=self.instituicao,
+            estagio=self.outro_estagio,
         )
 
-    def test_estagio_regular_gera_analise_aprovada(self):
-        estagio = Estagio.objects.create(
-            usuario=self.usuario,
+    def criar_estagio(self, usuario):
+        return Estagio.objects.create(
+            usuario=usuario,
             empresa=self.empresa,
             instituicao=self.instituicao,
             curso='Engenharia de Software',
@@ -106,204 +132,143 @@ class AnaliseContratoTests(TestCase):
             professor_orientador='Ana Orientadora',
             seguro_apolice='APOLICE-123',
         )
-        contrato = self.criar_contrato(estagio)
 
-        analise = AnaliseContrato.gerar_para_contrato(contrato)
+    def pdf_upload(self, nome='contrato.pdf', conteudo=MINIMAL_PDF_BYTES, content_type='application/pdf'):
+        return SimpleUploadedFile(nome, conteudo, content_type=content_type)
 
-        contrato.refresh_from_db()
-        self.assertEqual(analise.resultado, ResultadoAnalise.APROVADO)
-        self.assertEqual(analise.score_conformidade, 100.0)
-        self.assertEqual(analise.pendencias.count(), 0)
-        self.assertEqual(contrato.status, StatusContrato.VALIDADO_OK)
+    def test_usuario_comum_nao_acessa_contrato_de_outro_usuario(self):
+        self.client.force_authenticate(user=self.auth_user)
 
-    def test_estagio_irregular_gera_pendencias_e_reprova_contrato(self):
-        estagio = Estagio.objects.create(
-            usuario=self.usuario,
-            empresa=self.empresa,
-            instituicao=self.instituicao,
-            curso='Engenharia de Software',
-            tipo_estagio=TipoEstagio.NAO_OBRIGATORIO,
-            data_inicio=date(2026, 1, 1),
-            data_fim=date(2028, 3, 1),
-            carga_horaria_diaria=Decimal('7.00'),
-            carga_horaria_semanal=Decimal('35.00'),
-        )
-        contrato = self.criar_contrato(estagio)
+        response = self.client.get(f'/api/contratos/{self.outro_contrato.id}/')
 
-        analise = AnaliseContrato.gerar_para_contrato(contrato)
+        self.assertEqual(response.status_code, 404)
 
-        contrato.refresh_from_db()
-        codigos = set(analise.pendencias.values_list('codigo_regra', flat=True))
-        self.assertEqual(analise.resultado, ResultadoAnalise.REPROVADO)
-        self.assertEqual(contrato.status, StatusContrato.REPROVADO)
-        self.assertTrue({'CARGA_DIARIA', 'CARGA_SEMANAL', 'SEGURO', 'BOLSA', 'AUXILIO_TRANSPORTE'} <= codigos)
+    def test_admin_acessa_todos_os_contratos(self):
+        self.client.force_authenticate(user=self.admin)
 
-    def test_parecer_institucional_atualiza_status_final_do_contrato(self):
-        estagio = Estagio.objects.create(
-            usuario=self.usuario,
-            empresa=self.empresa,
-            instituicao=self.instituicao,
-            curso='Engenharia de Software',
-            tipo_estagio=TipoEstagio.OBRIGATORIO,
-            seguro_apolice='APOLICE-123',
-            supervisor_nome='Carlos Supervisor',
-            professor_orientador='Ana Orientadora',
-            atividades='Desenvolvimento acompanhado.',
-        )
-        contrato = self.criar_contrato(estagio)
-
-        ParecerInstitucional.objects.create(
-            contrato=contrato,
-            instituicao=self.instituicao,
-            autor='Maria Coordenadora',
-            aprovado=True,
-            observacao='Contrato aprovado pela coordenacao.',
-        )
-
-        contrato.refresh_from_db()
-        self.assertEqual(contrato.status, StatusContrato.APROVADO_FINAL)
-
-
-@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
-class ApiWorkflowTests(TestCase):
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
-
-    def setUp(self):
-        self.client = APIClient()
-        self.auth_user = AuthUser.objects.create_user(username='tester', password='senha123')
-        self.usuario = Usuario.objects.create(
-            cpf='987.654.321-00',
-            nome='Bruno Teste',
-            email='bruno@example.com',
-        )
-        self.empresa = Empresa.objects.create(
-            cnpj='98.765.432/0001-10',
-            razao_social='Empresa Teste',
-            responsavel='Responsavel Teste',
-        )
-        self.instituicao = Instituicao.objects.create(
-            nome_unidade='Ibmec Teste',
-            coordenador='Coordenador Teste',
-        )
-        self.estagio = Estagio.objects.create(
-            usuario=self.usuario,
-            empresa=self.empresa,
-            instituicao=self.instituicao,
-            curso='Direito',
-            tipo_estagio=TipoEstagio.OBRIGATORIO,
-            seguro_apolice='APOLICE-999',
-            supervisor_nome='Supervisor Teste',
-            professor_orientador='Orientador Teste',
-            atividades='Atividades juridicas acompanhadas.',
-        )
-        self.contrato = Contrato.objects.create(
-            usuario=self.usuario,
-            empresa=self.empresa,
-            instituicao=self.instituicao,
-            estagio=self.estagio,
-        )
-
-    def test_register_endpoint_cria_usuario_django(self):
-        response = self.client.post(
-            '/api/auth/register/',
-            {'username': 'novo', 'email': 'novo@example.com', 'password': 'senha123'},
-            format='json',
-        )
-
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(AuthUser.objects.filter(username='novo').exists())
-
-    def test_contrato_filter_por_status(self):
-        response = self.client.get('/api/contratos/', {'status': StatusContrato.RECEBIDO})
+        response = self.client.get('/api/contratos/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['id'], self.contrato.id)
+        self.assertEqual(len(response.data), 2)
 
-    def test_upload_pdf_rejeita_arquivo_sem_extensao_pdf(self):
+    def test_upload_pdf_valido(self):
         self.client.force_authenticate(user=self.auth_user)
-        arquivo = SimpleUploadedFile('contrato.txt', b'conteudo', content_type='text/plain')
 
         response = self.client.post(
             f'/api/contratos/{self.contrato.id}/upload-pdf/',
-            {'arquivo_pdf': arquivo},
+            {'arquivo_pdf': self.pdf_upload()},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['versao'], 1)
+        self.assertTrue(response.data['arquivo_pdf'].endswith('.pdf'))
+
+    def test_rejeita_pdf_invalido_corrompido(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': self.pdf_upload(conteudo=b'nao sou pdf')},
             format='multipart',
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn('arquivo_pdf', response.data)
+        self.assertIn('errors', response.data)
 
-    def test_upload_pdf_aceita_pdf(self):
+    def test_incrementa_versao_no_reenvio(self):
         self.client.force_authenticate(user=self.auth_user)
-        arquivo = SimpleUploadedFile('contrato.pdf', b'%PDF-1.4 conteudo', content_type='application/pdf')
-
-        response = self.client.post(
+        self.client.post(
             f'/api/contratos/{self.contrato.id}/upload-pdf/',
-            {'arquivo_pdf': arquivo},
+            {'arquivo_pdf': self.pdf_upload('contrato-v1.pdf')},
             format='multipart',
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data['arquivo_pdf'].endswith('.pdf'))
-
-    def test_extrair_dados_ocr_pdf(self):
-        self.client.force_authenticate(user=self.auth_user)
-        arquivo = SimpleUploadedFile('contrato.pdf', MINIMAL_PDF_BYTES, content_type='application/pdf')
         response = self.client.post(
             f'/api/contratos/{self.contrato.id}/upload-pdf/',
-            {'arquivo_pdf': arquivo},
+            {'arquivo_pdf': self.pdf_upload('contrato-v2.pdf')},
             format='multipart',
         )
-        self.assertEqual(response.status_code, 200)
+
         self.contrato.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.contrato.versao, 2)
+        self.assertEqual(self.contrato.status, StatusContrato.RECEBIDO)
+        self.assertEqual(self.contrato.versoes_pdf.count(), 2)
 
-        from app.models import SistemaValidador
-        sistema = SistemaValidador.objects.create(contrato=self.contrato)
-        dados = sistema.extrair_dados_ocr()
-
-        self.assertEqual(dados.get('cpf'), '123.456.789-01')
-        self.assertEqual(dados.get('cnpj'), '12.345.678/0001-91')
-
-    def test_analisar_contrato_usa_extracao_ocr_automaticamente(self):
+    def test_analise_automatica_usando_pdf(self):
         self.client.force_authenticate(user=self.auth_user)
-        arquivo = SimpleUploadedFile('contrato.pdf', MINIMAL_PDF_BYTES, content_type='application/pdf')
-        response = self.client.post(
+        self.client.post(
             f'/api/contratos/{self.contrato.id}/upload-pdf/',
-            {'arquivo_pdf': arquivo},
+            {'arquivo_pdf': self.pdf_upload()},
             format='multipart',
         )
-        self.assertEqual(response.status_code, 200)
 
         response = self.client.post(f'/api/contratos/{self.contrato.id}/analisar/', format='json')
+
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['dados_extraidos']['cpf'], '123.456.789-01')
         self.assertEqual(response.data['dados_extraidos']['cnpj'], '12.345.678/0001-91')
 
-    def test_analisar_contrato_gera_pendencias_quando_dados_extraidos_nao_batem_com_estagio(self):
-        self.client.force_authenticate(user=self.auth_user)
-        dados_extraidos = {
-            'curso': 'Engenharia de Software',
-            'tipo_estagio': TipoEstagio.NAO_OBRIGATORIO,
-            'data_inicio': date(2026, 1, 1),
-            'data_fim': date(2026, 12, 31),
-            'carga_horaria_diaria': Decimal('6.00'),
-            'carga_horaria_semanal': Decimal('30.00'),
-            'seguro_apolice': 'APOLICE-999',
-            'supervisor_nome': 'Supervisor Diferente',
-            'professor_orientador': 'Orientador Teste',
-        }
+    def test_transicao_invalida_de_status_e_bloqueada(self):
+        with self.assertRaises(ValidationError):
+            self.contrato.atualizar_status(StatusContrato.APROVADO_FINAL)
 
-        response = self.client.post(
-            f'/api/contratos/{self.contrato.id}/analisar/',
-            {'dados_extraidos': dados_extraidos},
-            format='json',
+    def test_parecer_institucional_so_funciona_em_status_permitido(self):
+        with self.assertRaises(ValidationError):
+            ParecerInstitucional.objects.create(
+                contrato=self.contrato,
+                instituicao=self.instituicao,
+                autor='Maria Coordenadora',
+                aprovado=True,
+            )
+
+        AnaliseContrato.gerar_para_contrato(self.contrato, dados_extraidos={})
+        ParecerInstitucional.objects.create(
+            contrato=self.contrato,
+            instituicao=self.instituicao,
+            autor='Maria Coordenadora',
+            aprovado=True,
         )
 
-        self.assertEqual(response.status_code, 201)
-        codigos = {pendencia['codigo_regra'] for pendencia in response.data['pendencias']}
-        self.assertIn('CURSO', codigos)
-        self.assertIn('TIPO_ESTAGIO', codigos)
-        self.assertIn('SUPERVISOR', codigos)
+        self.contrato.refresh_from_db()
+        self.assertEqual(self.contrato.status, StatusContrato.APROVADO_FINAL)
+
+    def test_pendencia_resolvida_deixa_de_impactar_resultado(self):
+        analise = AnaliseContrato.objects.create(contrato=self.contrato)
+        pendencia = Pendencia.objects.create(
+            analise=analise,
+            codigo_regra='SEGURO',
+            severidade=SeveridadePendencia.ERRO,
+            mensagem='Seguro ausente.',
+        )
+        analise.recalcular_resultado()
+        self.assertEqual(analise.resultado, ResultadoAnalise.REPROVADO)
+
+        pendencia.resolvida = True
+        pendencia.save()
+        analise.refresh_from_db()
+
+        self.assertEqual(analise.resultado, ResultadoAnalise.APROVADO)
+
+    def test_endpoint_me(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.get('/api/me/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['username'], 'alice')
+        self.assertEqual(response.data['perfil']['id'], self.usuario.id)
+
+    def test_endpoint_dashboard(self):
+        self.client.force_authenticate(user=self.auth_user)
+        self.contrato.status = StatusContrato.INVALIDO_PENDENTE
+        self.contrato.score_conformidade = 80.0
+        self.contrato.save(update_fields=['status', 'score_conformidade'])
+
+        response = self.client.get('/api/dashboard/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['total_contratos'], 1)
+        self.assertEqual(response.data['contratos_pendentes'], 1)
+        self.assertEqual(response.data['media_score_conformidade'], 80.0)

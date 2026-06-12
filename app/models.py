@@ -1,12 +1,18 @@
 from decimal import Decimal
-import re
-from datetime import datetime
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
 
 class Usuario(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name='perfil',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
     cpf = models.CharField(max_length=14, unique=True)
     nome = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
@@ -129,6 +135,12 @@ class RegraValidacao(models.Model):
                 'codigo': 'ATIVIDADES',
                 'nome': 'Plano de atividades',
                 'descricao': 'Atividades devem estar descritas para analise de compatibilidade.',
+                'severidade_padrao': SeveridadePendencia.PENDENCIA,
+            },
+            {
+                'codigo': 'ATIVIDADES_COMPATIBILIDADE',
+                'nome': 'Compatibilidade de atividades',
+                'descricao': 'Atividades devem ser compativeis com o curso ou passar por revisao manual.',
                 'severidade_padrao': SeveridadePendencia.PENDENCIA,
             },
             {
@@ -282,6 +294,10 @@ class Estagio(models.Model):
                 SeveridadePendencia.PENDENCIA,
                 'Atividades ou plano de atividades nao informados.',
             ))
+        else:
+            pendencia_compatibilidade = self.validar_compatibilidade_atividades()
+            if pendencia_compatibilidade:
+                pendencias.append(pendencia_compatibilidade)
 
         if self.tipo_estagio == TipoEstagio.NAO_OBRIGATORIO:
             if self.bolsa_auxilio is None or self.bolsa_auxilio <= 0:
@@ -306,6 +322,40 @@ class Estagio(models.Model):
 
         return [pendencia for pendencia in pendencias if pendencia]
 
+    def validar_compatibilidade_atividades(self):
+        curso = (self.curso or '').lower()
+        texto_atividades = f'{self.atividades} {self.plano_atividades}'.lower()
+        palavras_por_area = {
+            'direito': ['jurid', 'contrato', 'processo', 'peticao', 'audiencia', 'legal'],
+            'engenharia': ['desenvolvimento', 'sistema', 'projeto', 'codigo', 'software', 'dados'],
+            'software': ['desenvolvimento', 'sistema', 'codigo', 'software', 'programacao', 'teste'],
+            'administracao': ['gestao', 'processo', 'relatorio', 'financeiro', 'administrativo'],
+            'contabilidade': ['contabil', 'fiscal', 'balanco', 'tributario', 'financeiro'],
+            'marketing': ['campanha', 'midia', 'conteudo', 'mercado', 'cliente'],
+        }
+
+        area_detectada = None
+        for area in palavras_por_area:
+            if area in curso:
+                area_detectada = area
+                break
+
+        if not area_detectada:
+            return self._pendencia(
+                'ATIVIDADES_COMPATIBILIDADE',
+                SeveridadePendencia.PENDENCIA,
+                'Compatibilidade entre curso e atividades deve passar por revisao manual.',
+            )
+
+        if not any(palavra in texto_atividades for palavra in palavras_por_area[area_detectada]):
+            return self._pendencia(
+                'ATIVIDADES_COMPATIBILIDADE',
+                SeveridadePendencia.PENDENCIA,
+                'Atividades descritas nao indicam compatibilidade clara com o curso cadastrado.',
+            )
+
+        return None
+
     def status_validacao(self):
         pendencias = self.validar_regras_negocio()
         if any(item['severidade'] == SeveridadePendencia.ERRO for item in pendencias):
@@ -316,13 +366,33 @@ class Estagio(models.Model):
 
 
 class Contrato(models.Model):
+    TRANSICOES_STATUS = {
+        StatusContrato.RECEBIDO: {StatusContrato.PROCESSANDO},
+        StatusContrato.PROCESSANDO: {
+            StatusContrato.VALIDADO_OK,
+            StatusContrato.INVALIDO_PENDENTE,
+            StatusContrato.REPROVADO,
+        },
+        StatusContrato.VALIDADO_OK: {
+            StatusContrato.APROVADO_FINAL,
+            StatusContrato.INVALIDO_PENDENTE,
+        },
+        StatusContrato.INVALIDO_PENDENTE: {
+            StatusContrato.RECEBIDO,
+            StatusContrato.PROCESSANDO,
+            StatusContrato.REPROVADO,
+            StatusContrato.APROVADO_FINAL,
+        },
+        StatusContrato.REPROVADO: {StatusContrato.RECEBIDO, StatusContrato.PROCESSANDO},
+        StatusContrato.APROVADO_FINAL: set(),
+    }
+
     empresa = models.ForeignKey(Empresa, related_name='contratos', on_delete=models.CASCADE)
     usuario = models.ForeignKey(Usuario, related_name='contratos', on_delete=models.CASCADE)
     instituicao = models.ForeignKey(Instituicao, related_name='contratos', on_delete=models.SET_NULL, null=True, blank=True)
     estagio = models.ForeignKey(Estagio, related_name='contratos', on_delete=models.SET_NULL, null=True, blank=True)
     data_submissao = models.DateTimeField(auto_now_add=True)
     versao = models.PositiveIntegerField(default=1)
-    arquivo_original = models.BinaryField(blank=True, null=True)
     arquivo_pdf = models.FileField(upload_to='contratos/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=StatusContrato.choices, default=StatusContrato.RECEBIDO)
     score_conformidade = models.FloatField(default=0.0)
@@ -331,8 +401,15 @@ class Contrato(models.Model):
         return f'Contrato {self.id} - {self.empresa}'
 
     def atualizar_status(self, novo_status):
+        if novo_status == self.status:
+            return
+        status_permitidos = self.TRANSICOES_STATUS.get(self.status, set())
+        if novo_status not in status_permitidos:
+            raise ValidationError({
+                'status': f'Transicao invalida de {self.status} para {novo_status}.',
+            })
         self.status = novo_status
-        self.save()
+        self.save(update_fields=['status'])
 
     def clean(self):
         if self.arquivo_pdf and not self.arquivo_pdf.name.lower().endswith('.pdf'):
@@ -344,6 +421,27 @@ class Contrato(models.Model):
             self.empresa = self.estagio.empresa
             self.instituicao = self.estagio.instituicao
         super().save(*args, **kwargs)
+
+
+class VersaoContrato(models.Model):
+    contrato = models.ForeignKey(Contrato, related_name='versoes_pdf', on_delete=models.CASCADE)
+    arquivo_pdf = models.FileField(upload_to='contratos/versoes/')
+    numero_versao = models.PositiveIntegerField()
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='versoes_contrato_enviadas',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-numero_versao']
+        unique_together = ['contrato', 'numero_versao']
+
+    def __str__(self):
+        return f'Contrato {self.contrato_id} v{self.numero_versao}'
 
 
 class AnaliseContrato(models.Model):
@@ -484,6 +582,14 @@ class AnaliseContrato(models.Model):
 
     @classmethod
     def gerar_para_contrato(cls, contrato, dados_extraidos=None):
+        if contrato.status in [
+            StatusContrato.RECEBIDO,
+            StatusContrato.INVALIDO_PENDENTE,
+            StatusContrato.REPROVADO,
+        ]:
+            contrato.atualizar_status(StatusContrato.PROCESSANDO)
+
+        erro_extracao = None
         if dados_extraidos is None:
             dados_extraidos = {}
             try:
@@ -491,9 +597,20 @@ class AnaliseContrato(models.Model):
             except Exception:
                 sistema = None
             if sistema:
-                dados_extraidos = sistema.extrair_dados_ocr() or {}
+                try:
+                    dados_extraidos = sistema.extrair_dados_ocr()
+                except ValidationError as exc:
+                    erro_extracao = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
 
         analise = cls.objects.create(contrato=contrato, dados_extraidos=dados_extraidos)
+
+        if erro_extracao:
+            Pendencia.objects.create(
+                analise=analise,
+                codigo_regra='PDF_EXTRACAO',
+                severidade=SeveridadePendencia.PENDENCIA,
+                mensagem=erro_extracao,
+            )
 
         if not contrato.estagio:
             Pendencia.objects.create(
@@ -525,7 +642,7 @@ class AnaliseContrato(models.Model):
         return analise
 
     def recalcular_resultado(self):
-        pendencias = self.pendencias.all()
+        pendencias = self.pendencias.filter(resolvida=False)
         total_pendencias = pendencias.count()
         total_erros = pendencias.filter(severidade=SeveridadePendencia.ERRO).count()
 
@@ -544,9 +661,15 @@ class AnaliseContrato(models.Model):
             ResultadoAnalise.PENDENTE: StatusContrato.INVALIDO_PENDENTE,
             ResultadoAnalise.REPROVADO: StatusContrato.REPROVADO,
         }[self.resultado]
-        self.contrato.status = contrato_status
+        if (
+            contrato_status != self.contrato.status
+            and contrato_status not in self.contrato.TRANSICOES_STATUS.get(self.contrato.status, set())
+            and StatusContrato.PROCESSANDO in self.contrato.TRANSICOES_STATUS.get(self.contrato.status, set())
+        ):
+            self.contrato.atualizar_status(StatusContrato.PROCESSANDO)
+        self.contrato.atualizar_status(contrato_status)
         self.contrato.score_conformidade = self.score_conformidade
-        self.contrato.save(update_fields=['status', 'score_conformidade'])
+        self.contrato.save(update_fields=['score_conformidade'])
 
     def resumo_textual(self):
         linhas = [
@@ -573,6 +696,15 @@ class Pendencia(models.Model):
     def __str__(self):
         return f'{self.codigo_regra} - {self.severidade}'
 
+    def save(self, *args, **kwargs):
+        resolucao_alterada = False
+        if self.pk:
+            resolvida_anterior = Pendencia.objects.filter(pk=self.pk).values_list('resolvida', flat=True).first()
+            resolucao_alterada = resolvida_anterior != self.resolvida
+        super().save(*args, **kwargs)
+        if resolucao_alterada:
+            self.analise.recalcular_resultado()
+
 
 class RelatorioConformidade(models.Model):
     analise = models.OneToOneField(AnaliseContrato, related_name='relatorio', on_delete=models.CASCADE)
@@ -598,11 +730,29 @@ class ParecerInstitucional(models.Model):
     def __str__(self):
         return f'Parecer {self.id} - contrato {self.contrato_id}'
 
+    def clean(self):
+        if self.aprovado and self.contrato.status not in [
+            StatusContrato.VALIDADO_OK,
+            StatusContrato.INVALIDO_PENDENTE,
+        ]:
+            raise ValidationError({'contrato': 'Contrato deve estar validado ou pendente para aprovacao institucional.'})
+        if not self.aprovado and self.contrato.status not in [
+            StatusContrato.VALIDADO_OK,
+            StatusContrato.INVALIDO_PENDENTE,
+        ]:
+            raise ValidationError({'contrato': 'Contrato deve estar validado ou pendente para parecer institucional.'})
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         super().save(*args, **kwargs)
         self.contrato.instituicao = self.instituicao
-        self.contrato.status = StatusContrato.APROVADO_FINAL if self.aprovado else StatusContrato.INVALIDO_PENDENTE
-        self.contrato.save(update_fields=['instituicao', 'status'])
+        self.contrato.save(update_fields=['instituicao'])
+        if self.aprovado:
+            self.contrato.atualizar_status(StatusContrato.APROVADO_FINAL)
+        elif self.contrato.status == StatusContrato.VALIDADO_OK:
+            self.contrato.atualizar_status(StatusContrato.INVALIDO_PENDENTE)
+        else:
+            self.contrato.atualizar_status(StatusContrato.REPROVADO)
 
 
 class SistemaValidador(models.Model):
@@ -611,7 +761,7 @@ class SistemaValidador(models.Model):
     def __str__(self):
         return f'Sistema Validador do Contrato {self.contrato.id}'
 
-    def extrair_dados_ocr(self):
+    def _extrair_dados_ocr_descontinuado(self):
         return {}
 
     def validar_regras(self, dados):
@@ -626,17 +776,12 @@ class SistemaValidador(models.Model):
 
     def extrair_dados_ocr(self):
         if not self.contrato.arquivo_pdf:
-            return {}
+            raise ValidationError('Contrato nao possui PDF para extracao.')
 
-        try:
-            with self.contrato.arquivo_pdf.open('rb') as arquivo:
-                import pdfplumber
-                with pdfplumber.open(arquivo) as pdf:
-                    texto = '\n'.join(page.extract_text() or '' for page in pdf.pages)
-        except Exception:
-            return {}
+        from app.services import extrair_dados_pdf
 
-        return self._extrair_dados_do_texto(texto)
+        with self.contrato.arquivo_pdf.open('rb') as arquivo:
+            return extrair_dados_pdf(arquivo)
 
     def _extrair_dados_do_texto(self, texto):
         texto = texto or ''

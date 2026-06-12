@@ -4,11 +4,13 @@ from rest_framework.routers import DefaultRouter
 from app.api import (
     AnaliseContratoViewSet,
     ContratoViewSet,
+    DashboardAPIView,
     EmpresaViewSet,
     EstagioViewSet,
     InstituicaoViewSet,
     LoginAPIView,
     LogoutAPIView,
+    MeAPIView,
     ParecerInstitucionalViewSet,
     PendenciaViewSet,
     RegisterAPIView,
@@ -36,5 +38,7 @@ urlpatterns = [
     path('auth/register/', RegisterAPIView.as_view(), name='auth-register'),
     path('auth/login/', LoginAPIView.as_view(), name='auth-login'),
     path('auth/logout/', LogoutAPIView.as_view(), name='auth-logout'),
+    path('me/', MeAPIView.as_view(), name='me'),
+    path('dashboard/', DashboardAPIView.as_view(), name='dashboard'),
     path('', include(router.urls)),
 ]
