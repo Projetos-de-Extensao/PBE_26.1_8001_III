@@ -22,6 +22,7 @@ from app.models import (
     StatusContrato,
     TipoEstagio,
     Usuario,
+    VersaoContrato,
 )
 
 
@@ -151,6 +152,65 @@ class BackendHardeningTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
 
+    def test_usuario_comum_nao_cria_analise_direta(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post('/api/analises/', {'contrato': self.contrato.id}, format='json')
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_usuario_comum_nao_cria_relatorio_direto(self):
+        self.client.force_authenticate(user=self.auth_user)
+        analise = AnaliseContrato.objects.create(contrato=self.contrato)
+
+        response = self.client.post(
+            '/api/relatorios/',
+            {'analise': analise.id, 'status': ResultadoAnalise.APROVADO, 'conteudo': 'ok'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_usuario_comum_nao_cria_sistema_validador_direto(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post('/api/sistemas-validadores/', {'contrato': self.contrato.id}, format='json')
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_usuario_comum_nao_cria_parecer_para_contrato_de_outro_usuario(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            '/api/pareceres/',
+            {
+                'contrato': self.outro_contrato.id,
+                'instituicao': self.instituicao.id,
+                'autor': 'Alice',
+                'aprovado': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_usuario_comum_nao_edita_empresa_ou_instituicao(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        empresa_response = self.client.patch(
+            f'/api/empresas/{self.empresa.id}/',
+            {'responsavel': 'Outro'},
+            format='json',
+        )
+        instituicao_response = self.client.patch(
+            f'/api/instituicoes/{self.instituicao.id}/',
+            {'coordenador': 'Outro'},
+            format='json',
+        )
+
+        self.assertEqual(empresa_response.status_code, 403)
+        self.assertEqual(instituicao_response.status_code, 403)
+
     def test_upload_pdf_valido(self):
         self.client.force_authenticate(user=self.auth_user)
 
@@ -163,6 +223,11 @@ class BackendHardeningTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['versao'], 1)
         self.assertTrue(response.data['arquivo_pdf'].endswith('.pdf'))
+        self.assertEqual(self.contrato.versoes_pdf.count(), 1)
+        versao = self.contrato.versoes_pdf.get(numero_versao=1)
+        self.contrato.refresh_from_db()
+        self.assertNotEqual(versao.arquivo_pdf.name, self.contrato.arquivo_pdf.name)
+        self.assertTrue(versao.arquivo_pdf.name.startswith('contratos/versoes/'))
 
     def test_rejeita_pdf_invalido_corrompido(self):
         self.client.force_authenticate(user=self.auth_user)
@@ -175,6 +240,35 @@ class BackendHardeningTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('errors', response.data)
+
+    def test_upload_corrompido_nao_altera_versao_ou_status(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {'arquivo_pdf': self.pdf_upload(conteudo=b'nao sou pdf')},
+            format='multipart',
+        )
+
+        self.contrato.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.contrato.versao, 1)
+        self.assertEqual(self.contrato.status, StatusContrato.RECEBIDO)
+        self.assertEqual(self.contrato.versoes_pdf.count(), 0)
+
+    def test_upload_sem_arquivo_nao_cria_nova_versao(self):
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/upload-pdf/',
+            {},
+            format='multipart',
+        )
+
+        self.contrato.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.contrato.versao, 1)
+        self.assertEqual(self.contrato.versoes_pdf.count(), 0)
 
     def test_incrementa_versao_no_reenvio(self):
         self.client.force_authenticate(user=self.auth_user)
@@ -195,6 +289,8 @@ class BackendHardeningTests(TestCase):
         self.assertEqual(self.contrato.versao, 2)
         self.assertEqual(self.contrato.status, StatusContrato.RECEBIDO)
         self.assertEqual(self.contrato.versoes_pdf.count(), 2)
+        self.assertTrue(self.contrato.versoes_pdf.filter(numero_versao=1).exists())
+        self.assertTrue(self.contrato.versoes_pdf.filter(numero_versao=2).exists())
 
     def test_analise_automatica_usando_pdf(self):
         self.client.force_authenticate(user=self.auth_user)
@@ -243,13 +339,152 @@ class BackendHardeningTests(TestCase):
             mensagem='Seguro ausente.',
         )
         analise.recalcular_resultado()
+        relatorio = analise.relatorio
         self.assertEqual(analise.resultado, ResultadoAnalise.REPROVADO)
+        self.assertEqual(relatorio.status, ResultadoAnalise.REPROVADO)
 
         pendencia.resolvida = True
         pendencia.save()
         analise.refresh_from_db()
+        self.contrato.refresh_from_db()
+        relatorio.refresh_from_db()
 
         self.assertEqual(analise.resultado, ResultadoAnalise.APROVADO)
+        self.assertEqual(self.contrato.status, StatusContrato.VALIDADO_OK)
+        self.assertEqual(relatorio.status, ResultadoAnalise.APROVADO)
+        self.assertIn('Resultado: APROVADO', relatorio.conteudo)
+
+    def test_usuario_comum_so_altera_resolvida_em_pendencia_propria(self):
+        analise = AnaliseContrato.objects.create(contrato=self.contrato)
+        pendencia = Pendencia.objects.create(
+            analise=analise,
+            codigo_regra='SEGURO',
+            severidade=SeveridadePendencia.PENDENCIA,
+            mensagem='Revisar seguro.',
+        )
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.patch(
+            f'/api/pendencias/{pendencia.id}/',
+            {'resolvida': True},
+            format='json',
+        )
+
+        pendencia.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(pendencia.resolvida)
+
+    def test_usuario_comum_nao_altera_campos_restritos_de_pendencia(self):
+        analise = AnaliseContrato.objects.create(contrato=self.contrato)
+        pendencia = Pendencia.objects.create(
+            analise=analise,
+            codigo_regra='SEGURO',
+            severidade=SeveridadePendencia.PENDENCIA,
+            mensagem='Revisar seguro.',
+        )
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.patch(
+            f'/api/pendencias/{pendencia.id}/',
+            {
+                'mensagem': 'Alterada',
+                'severidade': SeveridadePendencia.ERRO,
+                'codigo_regra': 'OUTRA',
+                'analise': analise.id,
+            },
+            format='json',
+        )
+
+        pendencia.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(pendencia.mensagem, 'Revisar seguro.')
+        self.assertEqual(pendencia.severidade, SeveridadePendencia.PENDENCIA)
+
+    def test_usuario_comum_nao_altera_pendencia_de_outro_usuario(self):
+        analise = AnaliseContrato.objects.create(contrato=self.outro_contrato)
+        pendencia = Pendencia.objects.create(
+            analise=analise,
+            codigo_regra='SEGURO',
+            severidade=SeveridadePendencia.PENDENCIA,
+            mensagem='Revisar seguro.',
+        )
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.patch(
+            f'/api/pendencias/{pendencia.id}/',
+            {'resolvida': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_registro_cria_user_e_usuario_vinculado(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'carol',
+                'email': 'carol@example.com',
+                'password': 'senha123',
+                'cpf': '111.222.333-44',
+                'nome': 'Carol Teste',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        user = AuthUser.objects.get(username='carol')
+        self.assertEqual(user.perfil.nome, 'Carol Teste')
+        self.assertEqual(user.perfil.cpf, '111.222.333-44')
+
+    def test_endpoint_me_retorna_perfil_para_usuario_recadastrado(self):
+        self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'dora',
+                'email': 'dora@example.com',
+                'password': 'senha123',
+                'cpf': '222.333.444-55',
+                'nome': 'Dora Teste',
+            },
+            format='json',
+        )
+        user = AuthUser.objects.get(username='dora')
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get('/api/me/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['perfil']['cpf'], '222.333.444-55')
+
+    def test_contrato_aprovado_final_nao_pode_ser_reanalisado_sem_reenvio(self):
+        AnaliseContrato.gerar_para_contrato(self.contrato, dados_extraidos={})
+        ParecerInstitucional.objects.create(
+            contrato=self.contrato,
+            instituicao=self.instituicao,
+            autor='Maria Coordenadora',
+            aprovado=True,
+        )
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(f'/api/contratos/{self.contrato.id}/analisar/', format='json')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_reanalise_em_status_permitido_nao_quebra_fluxo(self):
+        AnaliseContrato.gerar_para_contrato(self.contrato, dados_extraidos={})
+        self.contrato.refresh_from_db()
+        self.assertEqual(self.contrato.status, StatusContrato.VALIDADO_OK)
+        self.client.force_authenticate(user=self.auth_user)
+
+        response = self.client.post(
+            f'/api/contratos/{self.contrato.id}/analisar/',
+            {'dados_extraidos': {}},
+            format='json',
+        )
+
+        self.contrato.refresh_from_db()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.contrato.status, StatusContrato.VALIDADO_OK)
 
     def test_endpoint_me(self):
         self.client.force_authenticate(user=self.auth_user)

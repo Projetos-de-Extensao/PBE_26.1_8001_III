@@ -374,6 +374,7 @@ class Contrato(models.Model):
             StatusContrato.REPROVADO,
         },
         StatusContrato.VALIDADO_OK: {
+            StatusContrato.PROCESSANDO,
             StatusContrato.APROVADO_FINAL,
             StatusContrato.INVALIDO_PENDENTE,
         },
@@ -582,8 +583,12 @@ class AnaliseContrato(models.Model):
 
     @classmethod
     def gerar_para_contrato(cls, contrato, dados_extraidos=None):
+        if contrato.status == StatusContrato.APROVADO_FINAL:
+            raise ValidationError('Contrato aprovado em parecer final nao pode ser reanalisado sem novo envio de PDF.')
+
         if contrato.status in [
             StatusContrato.RECEBIDO,
+            StatusContrato.VALIDADO_OK,
             StatusContrato.INVALIDO_PENDENTE,
             StatusContrato.REPROVADO,
         ]:
@@ -634,11 +639,6 @@ class AnaliseContrato(models.Model):
                 )
 
         analise.recalcular_resultado()
-        RelatorioConformidade.objects.create(
-            analise=analise,
-            status=analise.resultado,
-            conteudo=analise.resumo_textual(),
-        )
         return analise
 
     def recalcular_resultado(self):
@@ -670,6 +670,13 @@ class AnaliseContrato(models.Model):
         self.contrato.atualizar_status(contrato_status)
         self.contrato.score_conformidade = self.score_conformidade
         self.contrato.save(update_fields=['score_conformidade'])
+        RelatorioConformidade.objects.update_or_create(
+            analise=self,
+            defaults={
+                'status': self.resultado,
+                'conteudo': self.resumo_textual(),
+            },
+        )
 
     def resumo_textual(self):
         linhas = [
@@ -761,19 +768,6 @@ class SistemaValidador(models.Model):
     def __str__(self):
         return f'Sistema Validador do Contrato {self.contrato.id}'
 
-    def _extrair_dados_ocr_descontinuado(self):
-        return {}
-
-    def validar_regras(self, dados):
-        analise = AnaliseContrato.gerar_para_contrato(self.contrato, dados_extraidos=dados)
-        return analise.score_conformidade
-
-    def gerar_relatorio_validacao(self):
-        analise = self.contrato.analises.first()
-        if not analise:
-            analise = AnaliseContrato.gerar_para_contrato(self.contrato)
-        return analise.relatorio.conteudo
-
     def extrair_dados_ocr(self):
         if not self.contrato.arquivo_pdf:
             raise ValidationError('Contrato nao possui PDF para extracao.')
@@ -782,70 +776,3 @@ class SistemaValidador(models.Model):
 
         with self.contrato.arquivo_pdf.open('rb') as arquivo:
             return extrair_dados_pdf(arquivo)
-
-    def _extrair_dados_do_texto(self, texto):
-        texto = texto or ''
-
-        dados = {
-            'cpf': self._buscar_regex(texto, r'\bcpf[:\s]*([0-9\.\-]+)'),
-            'cnpj': self._buscar_regex(texto, r'\bcnpj[:\s]*([0-9\./\-]+)'),
-            'curso': self._buscar_regex(texto, r'\bcurso[:\s]*([^\n]+)'),
-            'tipo_estagio': self._parse_tipo_estagio(self._buscar_regex(texto, r'\btipo\s+de\s+estagi[oó][:\s]*([^\n]+)')),
-            'data_inicio': self._parse_data(self._buscar_regex(texto, r'\bdata(?:\s+de)?\s+in[ií]cio[:\s]*([0-9/\-]+)')),
-            'data_fim': self._parse_data(self._buscar_regex(texto, r'\bdata(?:\s+de)?\s+fim[:\s]*([0-9/\-]+)')),
-            'carga_horaria_diaria': self._parse_decimal(self._buscar_regex(texto, r'\bcarga\s+hor[aá]ria\s+di[aá]ria[:\s]*([0-9\.,]+)')),
-            'carga_horaria_semanal': self._parse_decimal(self._buscar_regex(texto, r'\bcarga\s+hor[aá]ria\s+semanal[:\s]*([0-9\.,]+)')),
-            'seguro_apolice': self._buscar_regex(texto, r'\bseguro(?:\s+ap[oó]lice)?[:\s]*([^\n]+)'),
-            'supervisor_nome': self._buscar_regex(texto, r'\bsupervisor(?:\s+nome)?[:\s]*([^\n]+)'),
-            'professor_orientador': self._buscar_regex(texto, r'\bprofessor\s+orientador[:\s]*([^\n]+)'),
-            'bolsa_auxilio': self._parse_decimal(self._buscar_regex(texto, r'\bbolsa(?:\s+aux[ií]lio)?[:\s]*([0-9\.,]+)')),
-            'auxilio_transporte': self._parse_bool(self._buscar_regex(texto, r'\baux[ií]lio(?:\s+transporte)?[:\s]*(sim|nao|não|true|false|1|0)')),
-            'atividades': self._buscar_regex(texto, r'\batividades[:\s]*([^\n]+)'),
-            'plano_atividades': self._buscar_regex(texto, r'\bplano\s+de\s+atividades[:\s]*([^\n]+)'),
-        }
-
-        return {k: v for k, v in dados.items() if v is not None}
-
-    def _buscar_regex(self, texto, padrao):
-        match = re.search(padrao, texto, flags=re.I | re.M)
-        return match.group(1).strip() if match else None
-
-    def _parse_data(self, valor):
-        if not valor:
-            return None
-        valor = valor.strip().replace(' ', '')
-        for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
-            try:
-                return datetime.strptime(valor, fmt).date()
-            except ValueError:
-                continue
-        return None
-
-    def _parse_decimal(self, valor):
-        if not valor:
-            return None
-        normalized = valor.replace('.', '').replace(',', '.')
-        try:
-            return Decimal(normalized)
-        except Exception:
-            return None
-
-    def _parse_bool(self, valor):
-        if not valor:
-            return None
-        valor = valor.strip().lower()
-        if valor in ('sim', 's', 'true', 'verdadeiro', '1'):
-            return True
-        if valor in ('nao', 'não', 'n', 'false', 'f', '0'):
-            return False
-        return None
-
-    def _parse_tipo_estagio(self, valor):
-        if not valor:
-            return None
-        texto = valor.strip().lower()
-        if 'obrig' in texto:
-            return TipoEstagio.OBRIGATORIO
-        if 'nao' in texto or 'não' in texto:
-            return TipoEstagio.NAO_OBRIGATORIO
-        return None

@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import transaction
 from rest_framework import serializers
 
 from app.models import (
@@ -13,6 +14,7 @@ from app.models import (
     RegraValidacao,
     RelatorioConformidade,
     SistemaValidador,
+    StatusContrato,
     Usuario,
     VersaoContrato,
 )
@@ -147,7 +149,7 @@ class ContratoSerializer(serializers.ModelSerializer):
         novo_pdf = validated_data.get('arquivo_pdf')
         if novo_pdf:
             instance.versao = instance.versao + 1 if instance.arquivo_pdf else 1
-            instance.status = 'RECEBIDO'
+            instance.status = StatusContrato.RECEBIDO
             instance.score_conformidade = 0.0
         return super().update(instance, validated_data)
 
@@ -172,7 +174,7 @@ class PendenciaSerializer(serializers.ModelSerializer):
             'resolvida',
             'criado_em',
         ]
-        read_only_fields = ['id', 'criado_em']
+        read_only_fields = ['id', 'analise', 'regra', 'codigo_regra', 'severidade', 'mensagem', 'criado_em']
 
 
 class RelatorioConformidadeSerializer(serializers.ModelSerializer):
@@ -226,28 +228,29 @@ class SistemaValidadorSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
-    cpf = serializers.CharField(write_only=True, required=False)
-    nome = serializers.CharField(write_only=True, required=False)
+    email = serializers.EmailField(required=True)
+    cpf = serializers.CharField(write_only=True, required=True)
+    nome = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password', 'cpf', 'nome']
         read_only_fields = ['id']
 
+    @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop('password')
-        cpf = validated_data.pop('cpf', None)
-        nome = validated_data.pop('nome', None)
+        cpf = validated_data.pop('cpf')
+        nome = validated_data.pop('nome')
         user = User(**validated_data)
         user.set_password(password)
         user.save()
-        if cpf:
-            Usuario.objects.create(
-                user=user,
-                cpf=cpf,
-                nome=nome or user.username,
-                email=user.email,
-            )
+        Usuario.objects.create(
+            user=user,
+            cpf=cpf,
+            nome=nome,
+            email=user.email,
+        )
         return user
 
     def validate_username(self, value):
@@ -258,6 +261,13 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         if value and User.objects.filter(email=value).exists():
             raise serializers.ValidationError('Email ja cadastrado.')
+        if value and Usuario.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Email ja cadastrado em perfil de usuario.')
+        return value
+
+    def validate_cpf(self, value):
+        if Usuario.objects.filter(cpf=value).exists():
+            raise serializers.ValidationError('CPF ja cadastrado.')
         return value
 
 

@@ -1,7 +1,7 @@
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Avg, Count
-from rest_framework import parsers, permissions, status, viewsets
+from django.db.models import Avg, Count, Q
+from rest_framework import mixins, parsers, permissions, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -138,7 +138,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 class EmpresaViewSet(viewsets.ModelViewSet):
     queryset = Empresa.objects.all()
     serializer_class = EmpresaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsStaffOrReadOnly]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -147,13 +147,13 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         perfil = _perfil_usuario(self.request.user)
         if not perfil:
             return queryset.none()
-        return queryset.filter(estagios__usuario=perfil).distinct()
+        return queryset.filter(Q(estagios__usuario=perfil) | Q(contratos__usuario=perfil)).distinct()
 
 
 class InstituicaoViewSet(viewsets.ModelViewSet):
     queryset = Instituicao.objects.all()
     serializer_class = InstituicaoSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsStaffOrReadOnly]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -162,7 +162,7 @@ class InstituicaoViewSet(viewsets.ModelViewSet):
         perfil = _perfil_usuario(self.request.user)
         if not perfil:
             return queryset.none()
-        return queryset.filter(estagios__usuario=perfil).distinct()
+        return queryset.filter(Q(estagios__usuario=perfil) | Q(contratos__usuario=perfil)).distinct()
 
 
 class RegraValidacaoViewSet(viewsets.ModelViewSet):
@@ -239,20 +239,35 @@ class ContratoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload-pdf', parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def upload_pdf(self, request, pk=None):
         contrato = self.get_object()
+        arquivo_enviado = request.FILES.get('arquivo_pdf')
+        if not arquivo_enviado:
+            return Response(
+                {'detail': 'Envie um arquivo no campo arquivo_pdf.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = self.get_serializer(contrato, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         contrato = serializer.save()
-        if contrato.arquivo_pdf:
-            VersaoContrato.objects.create(
-                contrato=contrato,
-                arquivo_pdf=contrato.arquivo_pdf.name,
-                numero_versao=contrato.versao,
-                enviado_por=request.user if request.user.is_authenticated else None,
-            )
-        return Response(serializer.data)
+        numero_versao = contrato.versao
+        while VersaoContrato.objects.filter(contrato=contrato, numero_versao=numero_versao).exists():
+            numero_versao += 1
+        if numero_versao != contrato.versao:
+            contrato.versao = numero_versao
+            contrato.save(update_fields=['versao'])
+        try:
+            arquivo_enviado.seek(0)
+        except Exception:
+            pass
+        versao = VersaoContrato(
+            contrato=contrato,
+            numero_versao=numero_versao,
+            enviado_por=request.user if request.user.is_authenticated else None,
+        )
+        versao.arquivo_pdf.save(arquivo_enviado.name, arquivo_enviado, save=True)
+        return Response(self.get_serializer(contrato).data)
 
 
-class AnaliseContratoViewSet(viewsets.ModelViewSet):
+class AnaliseContratoViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AnaliseContrato.objects.select_related('contrato').prefetch_related('pendencias')
     serializer_class = AnaliseContratoSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -270,7 +285,7 @@ class AnaliseContratoViewSet(viewsets.ModelViewSet):
         return _aplicar_filtro_data(queryset, params, 'criado_em')
 
 
-class PendenciaViewSet(viewsets.ModelViewSet):
+class PendenciaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     queryset = Pendencia.objects.select_related('analise', 'regra')
     serializer_class = PendenciaSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -290,8 +305,25 @@ class PendenciaViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(resolvida=resolvida)
         return queryset
 
+    def update(self, request, *args, **kwargs):
+        if kwargs.get('partial'):
+            return super().update(request, *args, **kwargs)
+        return Response(
+            {'detail': 'Use PATCH e envie apenas o campo resolvida.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
-class RelatorioConformidadeViewSet(viewsets.ModelViewSet):
+    def partial_update(self, request, *args, **kwargs):
+        campos_permitidos = {'resolvida'}
+        if set(request.data.keys()) - campos_permitidos:
+            return Response(
+                {'detail': 'Apenas o campo resolvida pode ser alterado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+
+class RelatorioConformidadeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = RelatorioConformidade.objects.select_related('analise')
     serializer_class = RelatorioConformidadeSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -312,7 +344,7 @@ class RelatorioConformidadeViewSet(viewsets.ModelViewSet):
 class ParecerInstitucionalViewSet(viewsets.ModelViewSet):
     queryset = ParecerInstitucional.objects.select_related('contrato', 'instituicao')
     serializer_class = ParecerInstitucionalSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsStaffOrReadOnly]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -330,7 +362,7 @@ class ParecerInstitucionalViewSet(viewsets.ModelViewSet):
         return _aplicar_filtro_data(queryset, params, 'criado_em')
 
 
-class SistemaValidadorViewSet(viewsets.ModelViewSet):
+class SistemaValidadorViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SistemaValidador.objects.select_related('contrato')
     serializer_class = SistemaValidadorSerializer
     permission_classes = [permissions.IsAuthenticated]
